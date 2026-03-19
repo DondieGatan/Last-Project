@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Analysis Result - {{ resume.candidate_name }}{% endblock %}
+
+{% block content %}
+{% set analysis = resume.analysis %}
+
+<!-- Header: Name + Overall Score -->
+<div class="result-header">
+    <div class="candidate-info">
+        <h2>{{ resume.candidate_name }}</h2>
+        {% if resume.email %}<p>{{ resume.email }}</p>{% endif %}
+        {% if resume.phone %}<p>{{ resume.phone }}</p>{% endif %}
+    </div>
+    {% if analysis %}
+    <div class="overall-score">
+        <div class="score-value">{{ analysis.overall_score }}</div>
+        <div class="score-label">Overall Score</div>
+    </div>
+    {% endif %}
+</div>
+
+{% if analysis %}
+<!-- Score Breakdown -->
+<div class="card">
+    <div class="card-header">Score Breakdown</div>
+    <div class="scores-grid">
+        {% set score_items = [
+            ('Skills', analysis.skills_score),
+            ('Education', analysis.education_score),
+            ('Experience', analysis.experience_score),
+            ('Formatting', analysis.formatting_score)
+        ] %}
+        {% for label, score in score_items %}
+        <div class="score-item">
+            <div class="label">
+                <span>{{ label }}</span>
+                <span>{{ score }}/100</span>
+            </div>
+            <div class="score-bar">
+                {% if score >= 80 %}
+                    {% set cls = 'excellent' %}
+                {% elif score >= 60 %}
+                    {% set cls = 'good' %}
+                {% elif score >= 40 %}
+                    {% set cls = 'average' %}
+                {% else %}
+                    {% set cls = 'poor' %}
+                {% endif %}
+                <div class="fill {{ cls }}" data-width="{{ score }}"></div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Recommended Field -->
+{% if analysis.recommended_field %}
+<div class="card" style="text-align:center;">
+    <div class="card-header">Recommended Career Field</div>
+    <div class="field-badge">{{ analysis.recommended_field }}</div>
+</div>
+{% endif %}
+{% endif %}
+
+<div class="two-col">
+    <!-- Skills -->
+    <div class="card">
+        <div class="card-header">Extracted Skills ({{ resume.skills|length }})</div>
+        {% if resume.skills %}
+        <div class="skills-container">
+            {% for skill in resume.skills %}
+            <span class="skill-tag" data-category="{{ skill.category }}">{{ skill.skill_name }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--gray-400);">No skills were detected.</p>
+        {% endif %}
+    </div>
+
+    <!-- Education -->
+    <div class="card">
+        <div class="card-header">Education</div>
+        {% if resume.education %}
+        <ul class="info-list">
+            {% for edu in resume.education %}
+            <li>
+                <div class="title">{{ edu.degree }}</div>
+                {% if edu.institution %}<div class="subtitle">{{ edu.institution }}</div>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p style="color:var(--gray-400);">No education details detected.</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Experience -->
+<div class="card">
+    <div class="card-header">Work Experience</div>
+    {% if resume.experience %}
+    <ul class="info-list">
+        {% for exp in resume.experience %}
+        <li>
+            <div class="title">{{ exp.title }}</div>
+            {% if exp.company %}<div class="subtitle">{{ exp.company }}</div>{% endif %}
+            {% if exp.description %}<p style="color:var(--gray-500);font-size:0.9rem;margin-top:0.25rem;">{{ exp.description }}</p>{% endif %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p style="color:var(--gray-400);">No work experience detected.</p>
+    {% endif %}
+</div>
+
+<!-- Recommendations -->
+{% if analysis and analysis.recommendations %}
+<div class="card">
+    <div class="card-header">Improvement Recommendations</div>
+    {% for rec in analysis.recommendations %}
+    <div class="recommendation-item">
+        <div class="icon">{{ loop.index }}</div>
+        <p>{{ rec }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Actions -->
+<div style="text-align:center;margin-top:1.5rem;">
+    <a href="{{ url_for('index') }}" class="btn btn-primary">Analyse Another Resume</a>
+    <a href="{{ url_for('history') }}" class="btn btn-secondary" style="margin-left:0.5rem;">View History</a>
+</div>
+{% endblock %}

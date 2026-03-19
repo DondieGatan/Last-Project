@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(source venv/Scripts/activate)",
+      "Bash(pip install:*)",
+      "Bash(mysql -u root -e \"SELECT 1\")",
+      "Bash(net start:*)",
+      "Bash(sc query:*)",
+      "Bash(tasklist)",
+      "Bash(sqlcmd -S localhost -E -Q \"SELECT @@VERSION\")",
+      "Bash(sqlcmd -S \"localhost\\\\SQLEXPRESS\" -E -Q \"SELECT @@VERSION\")",
+      "Bash(sqlcmd -S \".\" -E -Q \"SELECT @@VERSION\")",
+      "Bash(sqlcmd -S localhost -E -i \"D:/Graduation Project/Last Project/setup_db.sql\")",
+      "Bash(taskkill //F //IM python.exe)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(curl -s http://localhost:5000/)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/history)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/dashboard)"
+    ]
+  }
+}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Resume History - Smart Resume Analyser{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Analysed Resumes</span>
+        <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Upload New</a>
+    </div>
+
+    {% if resumes %}
+    <div class="table-wrapper">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Candidate Name</th>
+                    <th>Email</th>
+                    <th>Upload Date</th>
+                    <th>Overall Score</th>
+                    <th>Recommended Field</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in resumes %}
+                <tr>
+                    <td>{{ r.id }}</td>
+                    <td><strong>{{ r.candidate_name }}</strong></td>
+                    <td>{{ r.email or '—' }}</td>
+                    <td>{{ r.upload_date.strftime('%Y-%m-%d %H:%M') if r.upload_date else '—' }}</td>
+                    <td>
+                        {% if r.overall_score is not none %}
+                            {% if r.overall_score >= 80 %}
+                                {% set cls = 'excellent' %}
+                            {% elif r.overall_score >= 60 %}
+                                {% set cls = 'good' %}
+                            {% elif r.overall_score >= 40 %}
+                                {% set cls = 'average' %}
+                            {% else %}
+                                {% set cls = 'poor' %}
+                            {% endif %}
+                            <span class="score-badge {{ cls }}">{{ r.overall_score }}</span>
+                        {% else %}
+                            —
+                        {% endif %}
+                    </td>
+                    <td>{{ r.recommended_field or '—' }}</td>
+                    <td><a href="{{ url_for('result', resume_id=r.id) }}" class="btn btn-secondary btn-sm">View</a></td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:3rem;color:var(--gray-400);">
+        <p style="font-size:2rem;margin-bottom:0.5rem;">&#128196;</p>
+        <p>No resumes analysed yet. <a href="{{ url_for('index') }}">Upload one now!</a></p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

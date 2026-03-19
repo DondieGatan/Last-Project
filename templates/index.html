@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block title %}Upload Resume - Smart Resume Analyser{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero">
+    <h1>Analyse Your Resume with <span class="highlight">AI Power</span></h1>
+    <p>Upload your PDF resume and get instant feedback on skills, experience, education, and personalised career recommendations.</p>
+
+    <!-- Upload Form -->
+    <form id="upload-form" action="{{ url_for('upload_resume') }}" method="POST" enctype="multipart/form-data">
+        <div id="upload-area" class="upload-area">
+            <div class="icon">&#128196;</div>
+            <h3>Drag &amp; Drop your resume here</h3>
+            <p>or click to browse &mdash; PDF files only (max 16 MB)</p>
+            <input type="file" id="resume-input" name="resume" accept=".pdf">
+            <div id="file-name" class="file-name"></div>
+        </div>
+
+        <div class="spinner"></div>
+        <div class="loading-text">Analysing your resume... This may take a few seconds.</div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="max-width:550px;margin:1.5rem auto 0;">
+            Analyse Resume
+        </button>
+    </form>
+</section>
+
+<!-- Features Section -->
+<section class="features-grid">
+    <div class="feature-card">
+        <div class="feature-icon">&#128270;</div>
+        <h3>Skill Extraction</h3>
+        <p>Automatically identifies technical and soft skills using NLP-powered analysis.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#127919;</div>
+        <h3>Smart Scoring</h3>
+        <p>Get scores for skills, education, experience, and formatting with detailed breakdowns.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128161;</div>
+        <h3>Career Recommendations</h3>
+        <p>Receive personalised career field suggestions based on your skill profile.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128200;</div>
+        <h3>Analytics Dashboard</h3>
+        <p>Visualise trends and insights with an interactive dashboard and Power BI export.</p>
+    </div>
+</section>
+{% endblock %}
