@@ -1,4 +1,8 @@
 import pyodbc
+import hashlib
+import secrets
+import random
+from datetime import datetime, timedelta
 from config import Config
 
 
@@ -58,7 +62,9 @@ def save_education(resume_id, education_list):
     """Save education details for a resume."""
     conn = get_db_connection()
     cursor = conn.cursor()
-    for degree, institution in education_list:
+    for entry in education_list:
+        degree = entry.get('degree', '') if isinstance(entry, dict) else entry[0]
+        institution = entry.get('institution', '') if isinstance(entry, dict) else entry[1]
         cursor.execute(
             "INSERT INTO education (resume_id, degree, institution) VALUES (?, ?, ?)",
             (resume_id, degree, institution)
@@ -214,6 +220,54 @@ def get_dashboard_data():
     """)
     stats['field_distribution'] = _rows_to_dicts(cursor, cursor.fetchall())
 
+    # Score over time (monthly averages)
+    cursor.execute("""
+        SELECT
+            FORMAT(r.upload_date, 'yyyy-MM') AS month_label,
+            ROUND(AVG(CAST(ar.overall_score AS FLOAT)), 1) AS avg_score,
+            COUNT(*) AS resume_count
+        FROM resumes r
+        JOIN analysis_results ar ON ar.resume_id = r.id
+        WHERE r.upload_date IS NOT NULL
+        GROUP BY FORMAT(r.upload_date, 'yyyy-MM')
+        ORDER BY month_label
+    """)
+    stats['score_over_time'] = _rows_to_dicts(cursor, cursor.fetchall())
+
+    # ATS breakdown averages (skills, education, experience, formatting)
+    cursor.execute("""
+        SELECT
+            ROUND(AVG(CAST(skills_score AS FLOAT)), 1) AS avg_skills,
+            ROUND(AVG(CAST(education_score AS FLOAT)), 1) AS avg_education,
+            ROUND(AVG(CAST(experience_score AS FLOAT)), 1) AS avg_experience,
+            ROUND(AVG(CAST(formatting_score AS FLOAT)), 1) AS avg_formatting,
+            ROUND(AVG(CAST(overall_score AS FLOAT)), 1) AS avg_overall
+        FROM analysis_results
+    """)
+    ats_row = _row_to_dict(cursor, cursor.fetchone())
+    stats['ats_breakdown'] = {
+        'skills': ats_row.get('avg_skills') or 0,
+        'education': ats_row.get('avg_education') or 0,
+        'experience': ats_row.get('avg_experience') or 0,
+        'formatting': ats_row.get('avg_formatting') or 0,
+        'overall': ats_row.get('avg_overall') or 0
+    }
+
+    # Quality categories
+    cursor.execute("""
+        SELECT
+            SUM(CASE WHEN overall_score >= 80 THEN 1 ELSE 0 END) AS high_quality,
+            SUM(CASE WHEN overall_score >= 60 AND overall_score < 80 THEN 1 ELSE 0 END) AS medium_quality,
+            SUM(CASE WHEN overall_score < 60 THEN 1 ELSE 0 END) AS low_quality
+        FROM analysis_results
+    """)
+    quality_row = _row_to_dict(cursor, cursor.fetchone())
+    stats['quality_categories'] = {
+        'high': quality_row.get('high_quality') or 0,
+        'medium': quality_row.get('medium_quality') or 0,
+        'low': quality_row.get('low_quality') or 0
+    }
+
     # All resume data for Power BI export
     cursor.execute("SELECT * FROM resume_dashboard")
     stats['all_data'] = _rows_to_dicts(cursor, cursor.fetchall())
@@ -221,3 +275,183 @@ def get_dashboard_data():
     cursor.close()
     conn.close()
     return stats
+
+
+# ============================================================================
+# User Authentication Functions
+# ============================================================================
+
+def _hash_password(password):
+    """Hash a password with SHA-256 and a salt."""
+    salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
+    return f"{salt}${hashed}"
+
+
+def _verify_password(password, stored_hash):
+    """Verify a password against a stored hash."""
+    try:
+        salt, hashed = stored_hash.split('$', 1)
+        return hashlib.sha256((salt + password).encode()).hexdigest() == hashed
+    except (ValueError, AttributeError):
+        return False
+
+
+def init_users_table():
+    """Create the users table if it doesn't exist."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='users' AND xtype='U')
+        BEGIN
+            CREATE TABLE users (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                full_name NVARCHAR(150) NOT NULL,
+                email NVARCHAR(255) NOT NULL UNIQUE,
+                password_hash NVARCHAR(255) NOT NULL,
+                created_at DATETIME DEFAULT GETDATE(),
+                is_active BIT DEFAULT 1,
+                reset_token NVARCHAR(255) NULL,
+                reset_token_expiry DATETIME NULL
+            )
+        END
+    """)
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+def register_user(full_name, email, password):
+    """Register a new user. Returns (success, message)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Check if email already exists
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email.lower().strip(),))
+    if cursor.fetchone():
+        cursor.close()
+        conn.close()
+        return False, 'An account with this email already exists.'
+
+    password_hash = _hash_password(password)
+    cursor.execute(
+        "INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)",
+        (full_name.strip(), email.lower().strip(), password_hash)
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return True, 'Account created successfully.'
+
+
+def authenticate_user(email, password):
+    """Authenticate a user by email and password. Returns user dict or None."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT id, full_name, email, password_hash, is_active FROM users WHERE email = ?",
+        (email.lower().strip(),)
+    )
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return None
+
+    user = _row_to_dict(cursor, row)
+    cursor.close()
+    conn.close()
+
+    if not user.get('is_active'):
+        return None
+    if not _verify_password(password, user.get('password_hash', '')):
+        return None
+
+    return {'id': user['id'], 'full_name': user['full_name'], 'email': user['email']}
+
+
+def get_user_by_id(user_id):
+    """Get user by ID."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, full_name, email FROM users WHERE id = ? AND is_active = 1", (user_id,))
+    row = cursor.fetchone()
+    user = _row_to_dict(cursor, row) if row else None
+    cursor.close()
+    conn.close()
+    return user
+
+
+def get_user_by_email(email):
+    """Get user by email."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, full_name, email FROM users WHERE email = ? AND is_active = 1",
+                   (email.lower().strip(),))
+    row = cursor.fetchone()
+    user = _row_to_dict(cursor, row) if row else None
+    cursor.close()
+    conn.close()
+    return user
+
+
+def create_reset_code(email):
+    """Generate a 6-digit reset code for the given email. Returns code or None."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE email = ? AND is_active = 1", (email.lower().strip(),))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return None
+
+    code = str(random.randint(100000, 999999))
+    expiry = datetime.now() + timedelta(minutes=10)
+    cursor.execute(
+        "UPDATE users SET reset_token = ?, reset_token_expiry = ? WHERE email = ?",
+        (code, expiry, email.lower().strip())
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return code
+
+
+def verify_reset_code(email, code):
+    """Verify a 6-digit reset code. Returns True if valid."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT reset_token, reset_token_expiry FROM users "
+        "WHERE email = ? AND is_active = 1",
+        (email.lower().strip(),)
+    )
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return False
+
+    user = _row_to_dict(cursor, row)
+    cursor.close()
+    conn.close()
+
+    if (user['reset_token'] and user['reset_token'] == code.strip()
+            and user['reset_token_expiry'] and user['reset_token_expiry'] >= datetime.now()):
+        return True
+    return False
+
+
+def reset_user_password(email, new_password):
+    """Reset password for a verified email. Returns (success, message)."""
+    password_hash = _hash_password(new_password)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE email = ?",
+        (password_hash, email.lower().strip())
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return True, 'Password has been reset successfully.'

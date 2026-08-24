@@ -3,6 +3,10 @@
 
 {% block content %}
 {% set analysis = resume.analysis %}
+{% set explanations = analysis.explanations if analysis and analysis.explanations else {} %}
+{% set ats = analysis.ats_results if analysis and analysis.ats_results else {} %}
+{% set career_roles = analysis.career_roles if analysis and analysis.career_roles else [] %}
+{% set employer = analysis.employer_summary if analysis and analysis.employer_summary else {} %}
 
 <!-- Header: Name + Overall Score -->
 <div class="result-header">
@@ -20,17 +24,71 @@
 </div>
 
 {% if analysis %}
-<!-- Score Breakdown -->
+
+<!-- ========== Employer-Oriented Insights (Feature 6) ========== -->
+{% if employer %}
+<div class="card employer-card">
+    <div class="card-header">Employer Quick Summary</div>
+    <div class="employer-grid">
+        <div class="employer-verdict {{ employer.verdict_class }}">
+            <div class="verdict-label">Verdict</div>
+            <div class="verdict-value">{{ employer.verdict }}</div>
+        </div>
+        <div class="employer-detail">
+            <span class="detail-label">Seniority</span>
+            <span class="detail-value">{{ employer.seniority }}</span>
+        </div>
+        <div class="employer-detail">
+            <span class="detail-label">Best Fit</span>
+            <span class="detail-value">{{ employer.primary_field }}</span>
+        </div>
+        <div class="employer-detail">
+            <span class="detail-label">Education</span>
+            <span class="detail-value">{{ employer.education_summary or 'Not specified' }}</span>
+        </div>
+    </div>
+    {% if employer.highlight_skills %}
+    <div style="margin-top:1rem;">
+        <strong style="font-size:0.85rem;color:var(--gray-500);">KEY SKILLS</strong>
+        <div class="skills-container" style="margin-top:0.5rem;">
+            {% for skill in employer.highlight_skills %}
+            <span class="skill-tag">{{ skill }}</span>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+    <div class="employer-assessment">
+        {% if employer.strengths %}
+        <div class="assessment-col">
+            <h4 class="section-success">Strengths</h4>
+            {% for s in employer.strengths %}
+            <p>&#10004; {{ s }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% if employer.concerns %}
+        <div class="assessment-col">
+            <h4 class="section-warning">Areas of Concern</h4>
+            {% for c in employer.concerns %}
+            <p>&#9888; {{ c }}</p>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Score Breakdown with Explanations -->
 <div class="card">
     <div class="card-header">Score Breakdown</div>
     <div class="scores-grid">
         {% set score_items = [
-            ('Skills', analysis.skills_score),
-            ('Education', analysis.education_score),
-            ('Experience', analysis.experience_score),
-            ('Formatting', analysis.formatting_score)
+            ('Skills', analysis.skills_score, 'skills'),
+            ('Education', analysis.education_score, 'education'),
+            ('Experience', analysis.experience_score, 'experience'),
+            ('Formatting', analysis.formatting_score, 'formatting')
         ] %}
-        {% for label, score in score_items %}
+        {% for label, score, key in score_items %}
         <div class="score-item">
             <div class="label">
                 <span>{{ label }}</span>
@@ -48,16 +106,166 @@
                 {% endif %}
                 <div class="fill {{ cls }}" data-width="{{ score }}"></div>
             </div>
+
+            {% if explanations.get(key) %}
+            <div class="score-explanation">
+                {% for reason in explanations[key].get('reasons', []) %}
+                <div class="explanation-reason">{{ reason }}</div>
+                {% endfor %}
+                {% if explanations[key].get('suggestions') %}
+                <div class="explanation-suggestions">
+                    <strong>How to improve:</strong>
+                    <ul>
+                    {% for sug in explanations[key]['suggestions'] %}
+                        <li>{{ sug }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
         {% endfor %}
     </div>
 </div>
 
-<!-- Recommended Field -->
-{% if analysis.recommended_field %}
+<!-- ========== ATS Simulation (Feature 2) ========== -->
+{% if ats %}
+<div class="card">
+    <div class="card-header">ATS Compatibility Scan</div>
+    <div class="ats-header">
+        <div class="ats-score-circle {% if ats.ats_score >= 70 %}excellent{% elif ats.ats_score >= 50 %}good{% elif ats.ats_score >= 30 %}average{% else %}poor{% endif %}">
+            <span class="ats-score-value">{{ ats.ats_score }}</span>
+            <span class="ats-score-label">ATS Score</span>
+        </div>
+        <div class="ats-verdict">
+            {% if ats.pass_likely %}
+            <span class="ats-pass">LIKELY TO PASS</span>
+            <p>Your resume should parse well through most ATS systems.</p>
+            {% else %}
+            <span class="ats-fail">AT RISK</span>
+            <p>Your resume may have issues with automated screening systems.</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Sections Found/Missing -->
+    <div class="two-col" style="margin-top:1.25rem;">
+        <div>
+            <h4 class="section-success" style="margin-bottom:0.5rem;">Sections Found</h4>
+            {% for section in ats.sections_found %}
+            <div class="ats-section-item found">&#10004; {{ section }}</div>
+            {% endfor %}
+        </div>
+        <div>
+            <h4 class="section-warning" style="margin-bottom:0.5rem;">Sections Missing</h4>
+            {% if ats.sections_missing %}
+            {% for section in ats.sections_missing %}
+            <div class="ats-section-item missing">&#10006; {{ section }}</div>
+            {% endfor %}
+            {% else %}
+            <div class="ats-section-item found">All required sections present!</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Formatting Issues -->
+    {% if ats.formatting_issues %}
+    <div style="margin-top:1.25rem;">
+        <h4 style="margin-bottom:0.75rem;">Formatting Issues</h4>
+        {% for issue in ats.formatting_issues %}
+        <div class="ats-issue severity-{{ issue.severity }}">
+            <div class="issue-header">
+                <span class="issue-severity">{{ issue.severity|upper }}</span>
+                <strong>{{ issue.issue }}</strong>
+            </div>
+            <p class="issue-detail">{{ issue.detail }}</p>
+            <p class="issue-fix"><strong>Fix:</strong> {{ issue.fix }}</p>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Readability -->
+    {% if ats.readability %}
+    <div class="ats-readability" style="margin-top:1.25rem;">
+        <h4 style="margin-bottom:0.75rem;">Readability</h4>
+        <div class="readability-grid">
+            <div class="readability-item">
+                <span class="readability-value">{{ ats.readability.word_count }}</span>
+                <span class="readability-label">Words</span>
+            </div>
+            <div class="readability-item">
+                <span class="readability-value">{{ ats.readability.line_count }}</span>
+                <span class="readability-label">Lines</span>
+            </div>
+            <div class="readability-item">
+                <span class="readability-value">{{ ats.readability.avg_sentence_length }}</span>
+                <span class="readability-label">Avg Words/Sentence</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+<!-- Recommended Career Fields -->
+{% if analysis.field_recommendations %}
+<div class="card">
+    <div class="card-header">Recommended Career Fields</div>
+    <div class="field-recommendations">
+        {% for rec in analysis.field_recommendations %}
+        <div class="field-rec-item {% if loop.first %}primary{% endif %}">
+            <div class="field-rec-header">
+                <span class="field-rec-name">{{ rec.field }}</span>
+                <span class="field-rec-confidence confidence-{{ 'high' if rec.confidence >= 70 else ('medium' if rec.confidence >= 40 else 'low') }}">
+                    {{ rec.confidence }}% match
+                </span>
+            </div>
+            <div class="field-rec-bar">
+                <div class="field-rec-fill" data-width="{{ rec.confidence }}" style="width:0%;"></div>
+            </div>
+            {% if rec.details %}
+            <div class="field-rec-details">{{ rec.details }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% elif analysis.recommended_field %}
 <div class="card" style="text-align:center;">
     <div class="card-header">Recommended Career Field</div>
     <div class="field-badge">{{ analysis.recommended_field }}</div>
+</div>
+{% endif %}
+
+<!-- ========== Career Fit Roles (Feature 5) ========== -->
+{% if career_roles %}
+<div class="card">
+    <div class="card-header">Suggested Job Roles for You</div>
+    <div class="roles-grid">
+        {% for role in career_roles %}
+        <div class="role-card">
+            <div class="role-header">
+                <h4>{{ role.role }}</h4>
+                <span class="role-fit {% if role.fit_score >= 60 %}high{% elif role.fit_score >= 35 %}medium{% else %}low{% endif %}">
+                    {{ role.fit_score }}% fit
+                </span>
+            </div>
+            <div class="role-level">{{ role.level|title }}-Level</div>
+            {% if role.matched_skills %}
+            <div class="role-skills">
+                {% for skill in role.matched_skills[:5] %}
+                <span class="mini-tag">{{ skill }}</span>
+                {% endfor %}
+                {% if role.matched_skills|length > 5 %}
+                <span class="mini-tag more">+{{ role.matched_skills|length - 5 }}</span>
+                {% endif %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
 </div>
 {% endif %}
 {% endif %}
@@ -127,8 +335,10 @@
 {% endif %}
 
 <!-- Actions -->
-<div style="text-align:center;margin-top:1.5rem;">
-    <a href="{{ url_for('index') }}" class="btn btn-primary">Analyse Another Resume</a>
-    <a href="{{ url_for('history') }}" class="btn btn-secondary" style="margin-left:0.5rem;">View History</a>
+<div class="action-buttons">
+    <a href="{{ url_for('personalize', resume_id=resume.id) }}" class="btn btn-primary">Get Personalized Feedback</a>
+    <a href="{{ url_for('job_match', resume_id=resume.id) }}" class="btn btn-secondary">Match Against Job Description</a>
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyse Another Resume</a>
+    <a href="{{ url_for('history') }}" class="btn btn-secondary">View History</a>
 </div>
 {% endblock %}

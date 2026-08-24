@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}Job Match Analysis - {{ resume.candidate_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Smart Job-Match Analysis</h2>
+    <p>Compare <strong>{{ resume.candidate_name }}'s</strong> resume against a specific job description.</p>
+</div>
+
+<!-- Job Description Input -->
+<div class="card">
+    <div class="card-header">Paste the Job Description</div>
+    <form method="POST">
+        <div class="form-group">
+            <label for="job_description">Job Description</label>
+            <textarea id="job_description" name="job_description" rows="10"
+                      placeholder="Paste the full job description here... Include requirements, responsibilities, and qualifications.">{{ job_description }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Analyse Match</button>
+    </form>
+</div>
+
+{% if match_result %}
+{% if match_result.error %}
+<div class="flash error">{{ match_result.error }}</div>
+{% else %}
+
+<!-- Match Score -->
+<div class="card match-score-card">
+    <div class="match-score-display">
+        <div class="match-circle {% if match_result.match_score >= 70 %}excellent{% elif match_result.match_score >= 50 %}good{% elif match_result.match_score >= 30 %}average{% else %}poor{% endif %}">
+            <span class="match-value">{{ match_result.match_score }}%</span>
+            <span class="match-label">Match</span>
+        </div>
+        <div class="match-verdict">
+            <h3>{{ match_result.recommendation }}</h3>
+            <p>{{ match_result.total_matched }} of {{ match_result.total_jd_keywords }} key terms matched</p>
+        </div>
+    </div>
+</div>
+
+<div class="two-col">
+    <!-- Matched Skills -->
+    <div class="card">
+        <div class="card-header section-success">Matched Skills ({{ match_result.matched_skills|length }})</div>
+        {% if match_result.matched_skills %}
+        <div class="skills-container">
+            {% for skill in match_result.matched_skills %}
+            <span class="skill-tag matched">{{ skill }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--gray-400);">No specific skill matches found.</p>
+        {% endif %}
+    </div>
+
+    <!-- Missing Skills with Recommendations -->
+    <div class="card">
+        <div class="card-header section-warning">Missing Skills ({{ match_result.missing_skills|length }})</div>
+        {% if match_result.missing_skill_recommendations %}
+        <div class="missing-skills-list">
+            {% for item in match_result.missing_skill_recommendations %}
+            <div class="missing-skill-item">
+                <span class="skill-tag missing">{{ item.skill }}</span>
+                <p class="skill-tip">{{ item.tip }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        {% elif match_result.missing_skills %}
+        <div class="skills-container">
+            {% for skill in match_result.missing_skills %}
+            <span class="skill-tag missing">{{ skill }}</span>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color:var(--gray-400);">No critical skill gaps detected — great match!</p>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Phrase Matches -->
+{% if match_result.phrase_matches %}
+<div class="card">
+    <div class="card-header">Phrase-Level Matches</div>
+    <div class="skills-container">
+        {% for phrase in match_result.phrase_matches %}
+        <span class="skill-tag phrase-match">{{ phrase }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Important Missing Keywords -->
+{% if match_result.important_missing_keywords or match_result.nice_to_have_keywords %}
+<div class="card">
+    <div class="card-header">Keywords to Add to Your Resume</div>
+    {% if match_result.important_missing_keywords %}
+    <p style="color:var(--gray-500);font-size:0.9rem;margin-bottom:0.75rem;"><strong>High Priority</strong> — These are recognized skills found in the job description but missing from your resume.</p>
+    <div class="skills-container" style="margin-bottom:1rem;">
+        {% for kw in match_result.important_missing_keywords %}
+        <span class="skill-tag missing">{{ kw }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+    {% if match_result.nice_to_have_keywords %}
+    <p style="color:var(--gray-500);font-size:0.9rem;margin-bottom:0.75rem;"><strong>Nice to Have</strong> — Additional terms from the job description you may want to include.</p>
+    <div class="skills-container">
+        {% for kw in match_result.nice_to_have_keywords %}
+        <span class="skill-tag" style="background:var(--gray-100);color:var(--gray-600);">{{ kw }}</span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}
+
+{% endif %}
+{% endif %}
+
+<div style="text-align:center;margin-top:1.5rem;">
+    <a href="{{ url_for('result', resume_id=resume.id) }}" class="btn btn-secondary">Back to Results</a>
+    <a href="{{ url_for('personalize', resume_id=resume.id) }}" class="btn btn-primary" style="margin-left:0.5rem;">Get Personalized Feedback</a>
+</div>
+{% endblock %}

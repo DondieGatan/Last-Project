@@ -3,12 +3,27 @@
 
 {% block content %}
 <div class="card">
-    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.75rem;">
         <span>Analysed Resumes</span>
-        <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Upload New</a>
+        <div style="display:flex;gap:0.75rem;align-items:center;flex-wrap:wrap;">
+            <div class="history-search-wrap">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" class="history-search-icon">
+                    <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.099zm-5.242 1.656a5.5 5.5 0 1 1 0-11 5.5 5.5 0 0 1 0 11z"/>
+                </svg>
+                <input type="text" id="history-search" placeholder="Search by name, email or field..." oninput="filterHistory(this.value)">
+                <button id="history-clear-btn" onclick="clearSearch()" title="Clear search" style="display:none;">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 16 16"><path d="M4.646 4.646a.5.5 0 0 1 .708 0L8 7.293l2.646-2.647a.5.5 0 0 1 .708.708L8.707 8l2.647 2.646a.5.5 0 0 1-.708.708L8 8.707l-2.646 2.647a.5.5 0 0 1-.708-.708L7.293 8 4.646 5.354a.5.5 0 0 1 0-.708z"/></svg>
+                </button>
+            </div>
+            <a href="{{ url_for('index') }}" class="btn btn-primary btn-sm">Upload New</a>
+        </div>
     </div>
 
     {% if resumes %}
+    <div id="history-no-results" style="display:none;text-align:center;padding:2rem;color:var(--gray-400);">
+        <p style="font-size:1.5rem;margin-bottom:0.5rem;">🔍</p>
+        <p>No candidates match your search.</p>
+    </div>
     <div class="table-wrapper">
         <table>
             <thead>
@@ -24,7 +39,7 @@
             </thead>
             <tbody>
                 {% for r in resumes %}
-                <tr>
+                <tr class="history-row" data-name="{{ r.candidate_name|lower }}" data-email="{{ (r.email or '')|lower }}" data-field="{{ (r.recommended_field or '')|lower }}">
                     <td>{{ r.id }}</td>
                     <td><strong>{{ r.candidate_name }}</strong></td>
                     <td>{{ r.email or '—' }}</td>
@@ -59,4 +74,89 @@
     </div>
     {% endif %}
 </div>
+
+{% block scripts %}
+<script>
+function filterHistory(query) {
+    var q = query.trim().toLowerCase();
+    var rows = document.querySelectorAll('.history-row');
+    var noResults = document.getElementById('history-no-results');
+    var clearBtn = document.getElementById('history-clear-btn');
+    var visible = 0;
+
+    rows.forEach(function(row) {
+        var name  = row.getAttribute('data-name')  || '';
+        var email = row.getAttribute('data-email') || '';
+        var field = row.getAttribute('data-field') || '';
+        var match = !q || name.indexOf(q) !== -1 || email.indexOf(q) !== -1 || field.indexOf(q) !== -1;
+        row.style.display = match ? '' : 'none';
+        if (match) visible++;
+    });
+
+    if (noResults) noResults.style.display = (visible === 0 && q) ? 'block' : 'none';
+    if (clearBtn)  clearBtn.style.display  = q ? 'inline-flex' : 'none';
+}
+
+function clearSearch() {
+    var input = document.getElementById('history-search');
+    if (input) { input.value = ''; input.focus(); }
+    filterHistory('');
+}
+</script>
+<style>
+.history-search-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+    background: white;
+    border: 2px solid var(--gray-200);
+    border-radius: 8px;
+    padding: 0 10px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    min-width: 260px;
+}
+.history-search-wrap:focus-within {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(79,70,229,0.1);
+}
+.history-search-icon {
+    color: var(--gray-400);
+    flex-shrink: 0;
+}
+.history-search-wrap input {
+    flex: 1;
+    border: none;
+    outline: none;
+    padding: 0.5rem 0.5rem;
+    font-size: 0.88rem;
+    background: transparent;
+    color: var(--dark);
+    min-width: 0;
+}
+.history-search-wrap input::placeholder { color: var(--gray-400); }
+#history-clear-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px;
+    color: var(--gray-400);
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+#history-clear-btn:hover { color: var(--danger); }
+[data-theme="dark"] .history-search-wrap {
+    background: #0f172a;
+    border-color: #334155;
+}
+[data-theme="dark"] .history-search-wrap input { color: #e2e8f0; }
+[data-theme="dark"] .history-search-wrap:focus-within { border-color: var(--primary); }
+@media (max-width: 480px) {
+    .history-search-wrap {
+        min-width: 0;
+        width: 100%;
+    }
+}
+</style>
+{% endblock %}
 {% endblock %}

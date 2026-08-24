@@ -5,15 +5,15 @@
 <!-- Hero Section -->
 <section class="hero">
     <h1>Analyse Your Resume with <span class="highlight">AI Power</span></h1>
-    <p>Upload your PDF resume and get instant feedback on skills, experience, education, and personalised career recommendations.</p>
+    <p>Upload your PDF resume or image and get instant feedback on skills, experience, education, ATS compatibility, and personalised career recommendations.</p>
 
     <!-- Upload Form -->
     <form id="upload-form" action="{{ url_for('upload_resume') }}" method="POST" enctype="multipart/form-data">
         <div id="upload-area" class="upload-area">
             <div class="icon">&#128196;</div>
             <h3>Drag &amp; Drop your resume here</h3>
-            <p>or click to browse &mdash; PDF files only (max 16 MB)</p>
-            <input type="file" id="resume-input" name="resume" accept=".pdf">
+            <p>or click to browse &mdash; PDF or image files (max 16 MB)</p>
+            <input type="file" id="resume-input" name="resume" accept=".pdf,.png,.jpg,.jpeg,.bmp,.tiff,.tif,.webp">
             <div id="file-name" class="file-name"></div>
         </div>
 
@@ -39,9 +39,29 @@
         <p>Get scores for skills, education, experience, and formatting with detailed breakdowns.</p>
     </div>
     <div class="feature-card">
+        <div class="feature-icon">&#129302;</div>
+        <h3>ATS Simulation</h3>
+        <p>See how your resume performs in Applicant Tracking Systems with transparent scoring.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128188;</div>
+        <h3>Job Match Analysis</h3>
+        <p>Compare your resume against job descriptions using semantic keyword matching.</p>
+    </div>
+    <div class="feature-card">
         <div class="feature-icon">&#128161;</div>
-        <h3>Career Recommendations</h3>
-        <p>Receive personalised career field suggestions based on your skill profile.</p>
+        <h3>Personalised Feedback</h3>
+        <p>Get tailored advice based on your career goals, experience level, and target role.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128221;</div>
+        <h3>Resume Builder</h3>
+        <p>Step-by-step guided resume builder with templates for students and professionals.</p>
+    </div>
+    <div class="feature-card">
+        <div class="feature-icon">&#128100;</div>
+        <h3>Employer Insights</h3>
+        <p>Quick-view summary for hiring managers showing candidate fit and key strengths.</p>
     </div>
     <div class="feature-card">
         <div class="feature-icon">&#128200;</div>

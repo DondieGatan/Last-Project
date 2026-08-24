@@ -6,6 +6,58 @@
       "runtimeExecutable": "D:/Graduation Project/Last Project/venv/Scripts/python.exe",
       "runtimeArgs": ["app.py"],
       "port": 5000
+    },
+    {
+      "name": "portfolio-site",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8091", "--directory", "D:/Graduation Project/dondiegatan-portfolio"],
+      "port": 8091
+    },
+    {
+      "name": "taskflow-crud",
+      "url": "http://localhost:3000"
+    },
+    {
+      "name": "library-management-system",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["D:/Graduation Project/library-management-system/app.py"],
+      "port": 5050
+    },
+    {
+      "name": "expense-tracker",
+      "runtimeExecutable": "D:/Graduation Project/expense-tracker/backend/venv/Scripts/python.exe",
+      "runtimeArgs": ["D:/Graduation Project/expense-tracker/backend/run.py"],
+      "port": 5100
+    },
+    {
+      "name": "expense-tracker-mobile",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": ["D:/Graduation Project/expense-tracker/mobile/node_modules/expo/bin/cli", "start", "D:/Graduation Project/expense-tracker/mobile", "--web", "--localhost", "--port", "8093"],
+      "port": 8093
+    },
+    {
+      "name": "expense-tracker-mobile-lan",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": ["D:/Graduation Project/expense-tracker/mobile/node_modules/expo/bin/cli", "start", "D:/Graduation Project/expense-tracker/mobile", "--lan", "--port", "8094"],
+      "port": 8094
+    },
+    {
+      "name": "mori-matcha",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": ["D:/Graduation Project/mori-matcha/node_modules/vite/bin/vite.js", "D:/Graduation Project/mori-matcha", "--port", "8092"],
+      "port": 8092
+    },
+    {
+      "name": "floss-backend",
+      "runtimeExecutable": "D:/Graduation Project/footnote/backend/venv/Scripts/python.exe",
+      "runtimeArgs": ["D:/Graduation Project/footnote/backend/run.py"],
+      "port": 5101
+    },
+    {
+      "name": "floss-frontend",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": ["D:/Graduation Project/footnote/frontend/node_modules/vite/bin/vite.js", "D:/Graduation Project/footnote/frontend", "--port", "5173"],
+      "port": 5173
     }
   ]
 }

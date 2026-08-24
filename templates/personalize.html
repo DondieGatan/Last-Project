@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}Personalized Feedback - {{ resume.candidate_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Personalized Feedback</h2>
+    <p>Get tailored advice for <strong>{{ resume.candidate_name }}</strong> based on career goals and target role.</p>
+</div>
+
+<!-- Input Form -->
+<div class="card">
+    <div class="card-header">Tell us about your goals</div>
+    <form method="POST" class="feedback-form">
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="career_goal">Career Goal</label>
+                <input type="text" id="career_goal" name="career_goal" value="{{ career_goal }}"
+                       placeholder="e.g., Web Development, Data Science, Management...">
+            </div>
+            <div class="form-group">
+                <label for="experience_level">Experience Level</label>
+                <select id="experience_level" name="experience_level">
+                    <option value="" {% if not experience_level %}selected{% endif %}>Auto-detect from resume</option>
+                    <option value="entry" {% if experience_level == 'entry' %}selected{% endif %}>Entry-Level / Student</option>
+                    <option value="junior" {% if experience_level == 'junior' %}selected{% endif %}>Junior (0-2 years)</option>
+                    <option value="mid" {% if experience_level == 'mid' %}selected{% endif %}>Mid-Level (2-5 years)</option>
+                    <option value="senior" {% if experience_level == 'senior' %}selected{% endif %}>Senior (5+ years)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="target_role">Target Job Role</label>
+                <input type="text" id="target_role" name="target_role" value="{{ target_role }}"
+                       placeholder="e.g., Software Engineer, Data Analyst, Project Manager...">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:1rem;">Generate Personalized Feedback</button>
+    </form>
+</div>
+
+{% if feedback %}
+<!-- Experience Level -->
+<div class="card">
+    <div class="card-header">Experience Level Assessment</div>
+    <div class="level-badge">{{ feedback.experience_level_assessment }}</div>
+</div>
+
+<!-- Strengths -->
+{% if feedback.strengths %}
+<div class="card">
+    <div class="card-header section-success">Your Strengths</div>
+    {% for item in feedback.strengths %}
+    <div class="feedback-item feedback-strength">
+        <span class="feedback-icon">&#10004;</span>
+        <p>{{ item }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Career Alignment -->
+{% if feedback.career_alignment %}
+<div class="card">
+    <div class="card-header">Career Alignment</div>
+    {% for item in feedback.career_alignment %}
+    <div class="feedback-item">
+        <span class="feedback-icon">&#127919;</span>
+        <p>{{ item }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Gaps -->
+{% if feedback.gaps %}
+<div class="card">
+    <div class="card-header section-warning">Skill Gaps to Address</div>
+    {% for item in feedback.gaps %}
+    <div class="feedback-item feedback-gap">
+        <span class="feedback-icon">&#9888;</span>
+        <p>{{ item }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Action Items -->
+{% if feedback.action_items %}
+<div class="card">
+    <div class="card-header">Action Items</div>
+    {% for item in feedback.action_items %}
+    <div class="feedback-item">
+        <span class="feedback-icon">{{ loop.index }}</span>
+        <p>{{ item }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Personalization Tips (Feature 7) -->
+{% if feedback.personalization_tips %}
+<div class="card">
+    <div class="card-header">Resume Personalization Tips</div>
+    <p class="card-subtitle">Customize your resume for: <strong>{{ target_role or 'your target role' }}</strong></p>
+    {% for tip in feedback.personalization_tips %}
+    <div class="feedback-item feedback-tip">
+        <span class="feedback-icon">&#128161;</span>
+        <p>{{ tip }}</p>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endif %}
+
+<div style="text-align:center;margin-top:1.5rem;">
+    <a href="{{ url_for('result', resume_id=resume.id) }}" class="btn btn-secondary">Back to Results</a>
+    <a href="{{ url_for('job_match', resume_id=resume.id) }}" class="btn btn-primary" style="margin-left:0.5rem;">Job Match Analysis</a>
+</div>
+{% endblock %}

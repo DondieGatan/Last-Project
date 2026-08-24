@@ -5,12 +5,12 @@
 document.addEventListener('DOMContentLoaded', function () {
 
     // ---------- File Upload Drag & Drop ----------
-    const uploadArea = document.getElementById('upload-area');
-    const fileInput = document.getElementById('resume-input');
-    const fileName = document.getElementById('file-name');
-    const uploadForm = document.getElementById('upload-form');
-    const spinner = document.querySelector('.spinner');
-    const loadingText = document.querySelector('.loading-text');
+    var uploadArea = document.getElementById('upload-area');
+    var fileInput = document.getElementById('resume-input');
+    var fileName = document.getElementById('file-name');
+    var uploadForm = document.getElementById('upload-form');
+    var spinner = document.querySelector('.spinner');
+    var loadingText = document.querySelector('.loading-text');
 
     if (uploadArea && fileInput) {
         uploadArea.addEventListener('click', function () {
@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
         fileInput.addEventListener('change', function () {
             if (fileInput.files.length > 0) {
-                const name = fileInput.files[0].name;
+                var name = fileInput.files[0].name;
                 if (fileName) {
                     fileName.textContent = name;
                     fileName.style.display = 'block';
@@ -41,17 +41,22 @@ document.addEventListener('DOMContentLoaded', function () {
             e.preventDefault();
             uploadArea.classList.remove('dragover');
 
-            const files = e.dataTransfer.files;
+            var allowedTypes = [
+                'application/pdf',
+                'image/png', 'image/jpeg', 'image/bmp',
+                'image/tiff', 'image/webp'
+            ];
+            var files = e.dataTransfer.files;
             if (files.length > 0) {
-                const file = files[0];
-                if (file.type === 'application/pdf') {
+                var file = files[0];
+                if (allowedTypes.indexOf(file.type) !== -1) {
                     fileInput.files = files;
                     if (fileName) {
                         fileName.textContent = file.name;
                         fileName.style.display = 'block';
                     }
                 } else {
-                    alert('Please upload a PDF file only.');
+                    alert('Please upload a PDF or image file (PNG, JPG, BMP, TIFF, WebP).');
                 }
             }
         });
@@ -66,11 +71,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
 
-            // Show loading state
             if (spinner) spinner.style.display = 'block';
             if (loadingText) loadingText.style.display = 'block';
 
-            const submitBtn = uploadForm.querySelector('button[type="submit"]');
+            var submitBtn = uploadForm.querySelector('button[type="submit"]');
             if (submitBtn) {
                 submitBtn.disabled = true;
                 submitBtn.textContent = 'Analysing...';
@@ -78,48 +82,56 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // ---------- Animate Score Bars ----------
-    const scoreBars = document.querySelectorAll('.score-bar .fill');
-    if (scoreBars.length > 0) {
-        const observer = new IntersectionObserver(function (entries) {
+    // ---------- Auth Form Submit Feedback ----------
+    // Register/login/reset forms are plain POSTs with a full page reload, so
+    // without this the button gives no sign anything happened until the new
+    // page arrives, which reads as a stuck/slow request.
+    var authForm = document.querySelector('.auth-form');
+    if (authForm) {
+        authForm.addEventListener('submit', function (e) {
+            if (!authForm.checkValidity()) return;
+
+            var submitBtn = authForm.querySelector('button[type="submit"]');
+            if (submitBtn && !submitBtn.disabled) {
+                submitBtn.disabled = true;
+                submitBtn.dataset.originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Please wait...';
+            }
+        });
+    }
+
+    // ---------- Generic Animated Bar Observer ----------
+    // Handles score bars, dashboard bars, field recommendation bars, and ATS bars
+    function createBarObserver(selector) {
+        var bars = document.querySelectorAll(selector);
+        if (bars.length === 0) return;
+
+        var observer = new IntersectionObserver(function (entries) {
             entries.forEach(function (entry) {
                 if (entry.isIntersecting) {
-                    const bar = entry.target;
-                    const width = bar.getAttribute('data-width');
-                    bar.style.width = width + '%';
+                    var bar = entry.target;
+                    var width = bar.getAttribute('data-width');
+                    if (width) {
+                        bar.style.width = width + '%';
+                    }
                     observer.unobserve(bar);
                 }
             });
         }, { threshold: 0.2 });
 
-        scoreBars.forEach(function (bar) {
+        bars.forEach(function (bar) {
             bar.style.width = '0%';
             observer.observe(bar);
         });
     }
 
-    // ---------- Animate Dashboard Bar Charts ----------
-    const barFills = document.querySelectorAll('.bar-fill');
-    if (barFills.length > 0) {
-        const observer2 = new IntersectionObserver(function (entries) {
-            entries.forEach(function (entry) {
-                if (entry.isIntersecting) {
-                    const bar = entry.target;
-                    const width = bar.getAttribute('data-width');
-                    bar.style.width = width + '%';
-                    observer2.unobserve(bar);
-                }
-            });
-        }, { threshold: 0.2 });
-
-        barFills.forEach(function (bar) {
-            bar.style.width = '0%';
-            observer2.observe(bar);
-        });
-    }
+    // Animate all bar types
+    createBarObserver('.score-bar .fill');
+    createBarObserver('.bar-fill');
+    createBarObserver('.field-rec-fill');
 
     // ---------- Flash Message Auto-dismiss ----------
-    const flashMessages = document.querySelectorAll('.flash');
+    var flashMessages = document.querySelectorAll('.flash');
     flashMessages.forEach(function (msg) {
         setTimeout(function () {
             msg.style.transition = 'opacity 0.5s';
@@ -131,11 +143,23 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     // ---------- Active Navigation Link ----------
-    const currentPath = window.location.pathname;
-    const navLinks = document.querySelectorAll('.navbar nav a');
+    var currentPath = window.location.pathname;
+    var navLinks = document.querySelectorAll('.navbar nav a');
     navLinks.forEach(function (link) {
-        if (link.getAttribute('href') === currentPath) {
+        var href = link.getAttribute('href');
+        if (href === currentPath || (currentPath.indexOf(href) === 0 && href !== '/')) {
             link.classList.add('active');
         }
+    });
+
+    // ---------- Smooth Scroll for Anchors ----------
+    document.querySelectorAll('a[href^="#"]').forEach(function (anchor) {
+        anchor.addEventListener('click', function (e) {
+            var target = document.querySelector(this.getAttribute('href'));
+            if (target) {
+                e.preventDefault();
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
     });
 });

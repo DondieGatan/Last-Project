@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Resume Builder - Smart Resume Analyser{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Resume Builder</h2>
+    <p>Build a professional resume step-by-step. This universal template works for any career field — IT, Business, Healthcare, Education, Engineering, and more.</p>
+</div>
+
+<!-- Go directly to the universal builder -->
+<div style="text-align:center;margin:2rem 0;">
+    <a href="{{ url_for('builder_template', template_id='universal') }}" class="btn btn-primary" style="font-size:1.1rem;padding:0.85rem 2.5rem;">
+        Start Building Your Resume
+    </a>
+</div>
+
+<!-- Tips Section -->
+<div class="card" style="margin-top:2rem;">
+    <div class="card-header">Resume Writing Tips for Any Career</div>
+    <div class="tips-grid">
+        <div class="tip-item">
+            <div class="tip-number">1</div>
+            <div>
+                <strong>Keep it concise</strong>
+                <p>Aim for 1 page if you have less than 5 years of experience. 2 pages maximum for senior roles.</p>
+            </div>
+        </div>
+        <div class="tip-item">
+            <div class="tip-number">2</div>
+            <div>
+                <strong>Use action verbs</strong>
+                <p>Start bullet points with words like "Developed", "Managed", "Designed", "Implemented", "Achieved".</p>
+            </div>
+        </div>
+        <div class="tip-item">
+            <div class="tip-number">3</div>
+            <div>
+                <strong>Quantify achievements</strong>
+                <p>"Increased sales by 25%" is much stronger than "Helped increase sales".</p>
+            </div>
+        </div>
+        <div class="tip-item">
+            <div class="tip-number">4</div>
+            <div>
+                <strong>Tailor for each job</strong>
+                <p>Customize your resume for each application. Mirror keywords from the job description.</p>
+            </div>
+        </div>
+        <div class="tip-item">
+            <div class="tip-number">5</div>
+            <div>
+                <strong>Use simple formatting</strong>
+                <p>Avoid tables, graphics, and fancy fonts. ATS systems prefer clean, single-column layouts.</p>
+            </div>
+        </div>
+        <div class="tip-item">
+            <div class="tip-number">6</div>
+            <div>
+                <strong>Proofread carefully</strong>
+                <p>Spelling and grammar mistakes are the #1 reason resumes get rejected. Have someone review yours.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

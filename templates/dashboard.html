@@ -2,154 +2,235 @@
 {% block title %}Dashboard - Smart Resume Analyser{% endblock %}
 
 {% block content %}
-<h2 style="font-weight:800;margin-bottom:1.5rem;">Analytics Dashboard</h2>
+<!-- Dashboard Header with Filters -->
+<div class="dash-header">
+    <div>
+        <h2 style="font-weight:800;margin-bottom:0.25rem;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" fill="var(--primary)" viewBox="0 0 16 16" style="vertical-align:-4px;margin-right:8px;">
+                <path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5h-2v12h2V2zm-2-1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1h-2zM6 7a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V7zm-5 4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1v-3z"/>
+            </svg>
+            Analytics Dashboard
+        </h2>
+        <p style="color:var(--gray-500);font-size:0.95rem;">Real-time insights from all analysed resumes</p>
+    </div>
+    <div class="dash-filters">
+        <select id="field-filter" onchange="filterDashboard()">
+            <option value="all">All Fields</option>
+            {% for field in data.field_distribution %}
+            <option value="{{ field.recommended_field }}">{{ field.recommended_field }}</option>
+            {% endfor %}
+        </select>
+    </div>
+</div>
 
 <!-- Stats Cards -->
 <div class="stats-grid">
     <div class="stat-card">
+        <div class="stat-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M5 4a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm-.5 2.5A.5.5 0 0 1 5 6h6a.5.5 0 0 1 0 1H5a.5.5 0 0 1-.5-.5zM5 8a.5.5 0 0 0 0 1h6a.5.5 0 0 0 0-1H5zm0 2a.5.5 0 0 0 0 1h3a.5.5 0 0 0 0-1H5z"/><path d="M2 2a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2z"/></svg>
+        </div>
         <div class="stat-value">{{ data.total_resumes }}</div>
         <div class="stat-label">Total Resumes</div>
     </div>
     <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(14,165,233,0.12);color:var(--secondary);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 4a.5.5 0 0 1 .5.5v3h3a.5.5 0 0 1 0 1h-3v3a.5.5 0 0 1-1 0v-3h-3a.5.5 0 0 1 0-1h3v-3A.5.5 0 0 1 8 4z"/></svg>
+        </div>
         <div class="stat-value">{{ data.avg_score }}</div>
         <div class="stat-label">Average Score</div>
     </div>
     <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(34,197,94,0.12);color:var(--success);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a24.767 24.767 0 0 1-1.871-.183.25.25 0 0 0-.068.495c.55.076 1.232.149 2.02.193a.25.25 0 0 0 .189-.071l.754-.736.847 1.71a.25.25 0 0 0 .404.062l.932-.97a25.286 25.286 0 0 0 1.922-.188.25.25 0 0 0-.068-.495c-.538.074-1.207.145-1.98.189a.25.25 0 0 0-.166.076l-.754.785-.842-1.7a.25.25 0 0 0-.182-.135z"/><path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2V1.866z"/></svg>
+        </div>
         <div class="stat-value">{{ data.top_skills|length }}</div>
-        <div class="stat-label">Unique Skills Found</div>
+        <div class="stat-label">Unique Skills</div>
     </div>
     <div class="stat-card">
+        <div class="stat-icon" style="background:rgba(139,92,246,0.12);color:#8b5cf6;">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor" viewBox="0 0 16 16"><path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828zm7.5-.141c.654-.689 1.782-.886 3.112-.752 1.234.124 2.503.523 3.388.893v9.923c-.918-.35-2.107-.692-3.287-.81-1.094-.111-2.278-.039-3.213.492V2.687zM8 1.783C7.015.936 5.587.81 4.287.94c-1.514.153-3.042.672-3.994 1.105A.5.5 0 0 0 0 2.5v11a.5.5 0 0 0 .707.455c.882-.4 2.303-.881 3.68-1.02 1.409-.142 2.59.087 3.223.877a.5.5 0 0 0 .78 0c.633-.79 1.814-1.019 3.222-.877 1.378.139 2.8.62 3.681 1.02A.5.5 0 0 0 16 13.5v-11a.5.5 0 0 0-.293-.455c-.952-.433-2.48-.952-3.994-1.105C10.413.809 8.985.936 8 1.783z"/></svg>
+        </div>
         <div class="stat-value">{{ data.field_distribution|length }}</div>
         <div class="stat-label">Career Fields</div>
     </div>
 </div>
 
-<!-- Charts -->
+<!-- Row 1: Score Distribution (Doughnut) + Top Skills (Bar) -->
 <div class="chart-grid">
-    <!-- Score Distribution -->
     <div class="chart-card">
-        <h3>Score Distribution</h3>
-        {% if data.score_distribution %}
-        <div class="bar-chart">
-            {% set colors = ['color-3', 'color-2', 'color-4', 'color-5'] %}
-            {% set max_count = data.score_distribution|map(attribute='count')|max if data.score_distribution else 1 %}
-            {% for item in data.score_distribution %}
-            <div class="bar-row">
-                <div class="bar-label">{{ item.rating }}</div>
-                <div class="bar-track">
-                    <div class="bar-fill {{ colors[loop.index0 % 4] }}"
-                         data-width="{{ (item.count / max_count * 100)|round }}"
-                         style="width:0%;">
-                        {{ item.count }}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--primary)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/><path d="M8 13A5 5 0 1 0 8 3a5 5 0 0 0 0 10z"/></svg>
+            Score Distribution
+        </h3>
+        <div class="chart-container" style="max-width:320px;margin:0 auto;">
+            <canvas id="scoreDistChart"></canvas>
         </div>
-        {% else %}
-        <p style="color:var(--gray-400);text-align:center;padding:2rem;">No data yet.</p>
-        {% endif %}
+        <div id="scoreLegend" class="chart-legend"></div>
     </div>
 
-    <!-- Top Skills -->
     <div class="chart-card">
-        <h3>Top Skills</h3>
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--success)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062z"/></svg>
+            Top Skills
+        </h3>
         {% if data.top_skills %}
-        <div class="bar-chart">
-            {% set max_freq = data.top_skills[0].frequency if data.top_skills else 1 %}
-            {% for skill in data.top_skills[:10] %}
-            <div class="bar-row">
-                <div class="bar-label">{{ skill.skill_name }}</div>
-                <div class="bar-track">
-                    <div class="bar-fill color-{{ (loop.index0 % 8) + 1 }}"
-                         data-width="{{ (skill.frequency / max_freq * 100)|round }}"
-                         style="width:0%;">
-                        {{ skill.frequency }}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
+        <div class="chart-container">
+            <canvas id="topSkillsChart"></canvas>
         </div>
         {% else %}
-        <p style="color:var(--gray-400);text-align:center;padding:2rem;">No data yet.</p>
-        {% endif %}
-    </div>
-
-    <!-- Recommended Fields -->
-    <div class="chart-card">
-        <h3>Career Fields Distribution</h3>
-        {% if data.field_distribution %}
-        <div class="bar-chart">
-            {% set max_field = data.field_distribution[0].count if data.field_distribution else 1 %}
-            {% for field in data.field_distribution %}
-            <div class="bar-row">
-                <div class="bar-label">{{ field.recommended_field }}</div>
-                <div class="bar-track">
-                    <div class="bar-fill color-{{ (loop.index0 % 8) + 1 }}"
-                         data-width="{{ (field.count / max_field * 100)|round }}"
-                         style="width:0%;">
-                        {{ field.count }}
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="color:var(--gray-400);text-align:center;padding:2rem;">No data yet.</p>
-        {% endif %}
-    </div>
-
-    <!-- Recent Resumes Summary -->
-    <div class="chart-card">
-        <h3>Recent Analyses</h3>
-        {% if data.all_data %}
-        <div class="table-wrapper">
-            <table>
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Score</th>
-                        <th>Field</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for row in data.all_data[:8] %}
-                    <tr>
-                        <td>{{ row.candidate_name }}</td>
-                        <td>
-                            {% if row.overall_score is not none %}
-                                {% if row.overall_score >= 80 %}
-                                    {% set cls = 'excellent' %}
-                                {% elif row.overall_score >= 60 %}
-                                    {% set cls = 'good' %}
-                                {% elif row.overall_score >= 40 %}
-                                    {% set cls = 'average' %}
-                                {% else %}
-                                    {% set cls = 'poor' %}
-                                {% endif %}
-                                <span class="score-badge {{ cls }}">{{ row.overall_score }}</span>
-                            {% else %}
-                                —
-                            {% endif %}
-                        </td>
-                        <td>{{ row.recommended_field or '—' }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-        {% else %}
-        <p style="color:var(--gray-400);text-align:center;padding:2rem;">No data yet.</p>
+        <p class="no-data">No skills data yet.</p>
         {% endif %}
     </div>
 </div>
 
+<!-- Row 2: Career Fields (Pie) + ATS Breakdown (Radar) -->
+<div class="chart-grid">
+    <div class="chart-card">
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#8b5cf6" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M1 2.828c.885-.37 2.154-.769 3.388-.893 1.33-.134 2.458.063 3.112.752v9.746c-.935-.53-2.12-.603-3.213-.493-1.18.12-2.37.461-3.287.811V2.828z"/></svg>
+            Career Fields Distribution
+        </h3>
+        {% if data.field_distribution %}
+        <div class="chart-container" style="max-width:320px;margin:0 auto;">
+            <canvas id="fieldPieChart"></canvas>
+        </div>
+        {% else %}
+        <p class="no-data">No data yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="chart-card">
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--warning)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm.93-9.412-1 4.705c-.07.34.029.533.304.533.194 0 .487-.07.686-.246l-.088.416c-.287.346-.92.598-1.465.598-.703 0-1.002-.422-.808-1.319l.738-3.468c.064-.293.006-.399-.287-.399l-.392-.034.089-.416 2.223-.344z"/><path d="M8 5.5a1 1 0 1 0 0-2 1 1 0 0 0 0 2z"/></svg>
+            ATS Score Breakdown
+        </h3>
+        <div class="chart-container" style="max-width:350px;margin:0 auto;">
+            <canvas id="atsRadarChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Row 3: Resume Quality (Bar) + Actionable Insights (Bar) -->
+<div class="chart-grid">
+    <div class="chart-card">
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--danger)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M4 11H2v3h2v-3zm5-4H7v7h2V7zm5-5h-2v12h2V2z"/></svg>
+            Resume Quality Categories
+        </h3>
+        <div class="chart-container">
+            <canvas id="qualityChart"></canvas>
+        </div>
+    </div>
+
+    <div class="chart-card">
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="#14b8a6" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M2 6a6 6 0 1 1 10.174 4.31c-.203.196-.359.4-.453.619l-.762 1.769A.5.5 0 0 1 10.5 13a.5.5 0 0 1 0 1 .5.5 0 0 1 0 1l-.224.447a1 1 0 0 1-.894.553H6.618a1 1 0 0 1-.894-.553L5.5 15a.5.5 0 0 1 0-1 .5.5 0 0 1 0-1 .5.5 0 0 1-.46-.302l-.761-1.77a1.964 1.964 0 0 0-.453-.618A5.984 5.984 0 0 1 2 6z"/></svg>
+            What Improves Scores Most
+        </h3>
+        <div class="chart-container">
+            <canvas id="actionChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Row 4: AI Insights Panel -->
+<div class="chart-grid">
+    <!-- AI Insights Panel -->
+    <div class="chart-card ai-insights-card" style="grid-column: 1 / -1;">
+        <h3>
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--primary)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5zM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062z"/><path d="M8.5 1.866a1 1 0 1 0-1 0V3h-2A4.5 4.5 0 0 0 1 7.5V8a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1v1a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-1a1 1 0 0 0 1-1V9a1 1 0 0 0-1-1v-.5A4.5 4.5 0 0 0 10.5 3h-2V1.866z"/></svg>
+            AI Insights
+        </h3>
+        <div class="insights-list" id="aiInsights">
+            <!-- Populated by JS -->
+        </div>
+    </div>
+</div>
+
+<!-- Recent Analyses (Upgraded Table) -->
+<div class="chart-card" style="margin-top:1.5rem;">
+    <h3>
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="var(--primary)" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M8 3.5a.5.5 0 0 0-1 0V9a.5.5 0 0 0 .252.434l3.5 2a.5.5 0 0 0 .496-.868L8 8.71V3.5z"/><path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16zm7-8A7 7 0 1 1 1 8a7 7 0 0 1 14 0z"/></svg>
+        Recent Analyses
+    </h3>
+    {% if data.all_data %}
+    <div class="table-wrapper">
+        <table class="recent-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Overall</th>
+                    <th>Skills</th>
+                    <th>Education</th>
+                    <th>Experience</th>
+                    <th>Formatting</th>
+                    <th>Field</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in data.all_data[:12] %}
+                <tr class="table-row-hover">
+                    <td style="font-weight:600;">{{ row.candidate_name or 'Unknown' }}</td>
+                    <td>
+                        {% if row.overall_score is not none %}
+                        {% if row.overall_score >= 80 %}{% set cls = 'excellent' %}{% set clr = '#22c55e' %}
+                        {% elif row.overall_score >= 60 %}{% set cls = 'good' %}{% set clr = '#0ea5e9' %}
+                        {% elif row.overall_score >= 40 %}{% set cls = 'average' %}{% set clr = '#f59e0b' %}
+                        {% else %}{% set cls = 'poor' %}{% set clr = '#ef4444' %}{% endif %}
+                        <div class="mini-score">
+                            <span class="score-badge {{ cls }}">{{ row.overall_score }}</span>
+                            <div class="mini-bar-track">
+                                <div class="mini-bar-fill" style="width:{{ row.overall_score }}%;background:{{ clr }};"></div>
+                            </div>
+                        </div>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if row.skills_score is not none %}
+                        <span class="score-pill">{{ row.skills_score }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if row.education_score is not none %}
+                        <span class="score-pill">{{ row.education_score }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if row.experience_score is not none %}
+                        <span class="score-pill">{{ row.experience_score }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td>
+                        {% if row.formatting_score is not none %}
+                        <span class="score-pill">{{ row.formatting_score }}</span>
+                        {% else %}—{% endif %}
+                    </td>
+                    <td><span class="field-tag">{{ row.recommended_field or '—' }}</span></td>
+                    <td>
+                        <a href="{{ url_for('result', resume_id=row.id) }}" class="btn-view">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="no-data">No resumes analysed yet. Upload your first resume to see data here.</p>
+    {% endif %}
+</div>
+
 <!-- Power BI Section -->
 <div class="powerbi-section">
-    <h3>Power BI Integration</h3>
+    <h3>
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M5.5 2A3.5 3.5 0 0 0 2 5.5v5A3.5 3.5 0 0 0 5.5 14h5a3.5 3.5 0 0 0 3.5-3.5V8a.5.5 0 0 1 1 0v2.5a4.5 4.5 0 0 1-4.5 4.5h-5A4.5 4.5 0 0 1 1 10.5v-5A4.5 4.5 0 0 1 5.5 1H8a.5.5 0 0 1 0 1H5.5z"/><path d="M16 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
+        Power BI Integration
+    </h3>
     <p>Export your resume analytics data for advanced visualisation in Power BI Desktop.</p>
-    <a href="{{ url_for('export_csv') }}" class="btn btn-success">Export as CSV</a>
-    <a href="{{ url_for('api_dashboard_data') }}" class="btn btn-secondary" target="_blank">View JSON API</a>
+    <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-top:0.75rem;">
+        <a href="{{ url_for('export_csv') }}" class="btn btn-success">Export as CSV</a>
+        <a href="{{ url_for('api_dashboard_data') }}" class="btn btn-secondary" target="_blank">View JSON API</a>
+    </div>
 </div>
 
 <div class="card" style="margin-top:1.5rem;">
@@ -162,4 +243,255 @@
         <li><strong>For live data:</strong> Use <em>Get Data &rarr; Web</em> and enter the JSON API URL: <code>http://localhost:5000/api/dashboard-data</code></li>
     </ol>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+// ===== Theme =====
+function getThemeColors() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    return { text: isDark ? '#e2e8f0' : '#1e293b', grid: isDark ? '#334155' : '#e2e8f0', bg: isDark ? '#1e293b' : '#ffffff' };
+}
+var theme = getThemeColors();
+Chart.defaults.color = theme.text;
+Chart.defaults.borderColor = theme.grid;
+
+// ===== RAW DATA from server =====
+var ALL_DATA = {{ data.all_data | tojson }};
+var ALL_SKILLS = {{ data.top_skills | tojson }};
+var PALETTE = ['#4f46e5','#0ea5e9','#22c55e','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316','#6366f1','#ef4444'];
+
+// ===== Chart instances (for destroy/rebuild) =====
+var charts = {};
+
+function destroyChart(id) {
+    if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ===== Compute stats from a filtered subset of ALL_DATA =====
+function computeStats(rows) {
+    var total = rows.length;
+    var sumOverall = 0, sumSkills = 0, sumEdu = 0, sumExp = 0, sumFmt = 0, counted = 0;
+    var high = 0, medium = 0, low = 0;
+    var excellent = 0, good = 0, average = 0, poor = 0;
+    var fieldCounts = {};
+
+    rows.forEach(function(r) {
+        var s = r.overall_score;
+        if (s !== null && s !== undefined) {
+            sumOverall += s; counted++;
+            sumSkills += (r.skills_score || 0);
+            sumEdu += (r.education_score || 0);
+            sumExp += (r.experience_score || 0);
+            sumFmt += (r.formatting_score || 0);
+            if (s >= 80) { excellent++; high++; }
+            else if (s >= 60) { good++; medium++; }
+            else if (s >= 40) { average++; low++; }
+            else { poor++; low++; }
+        }
+        var f = r.recommended_field || 'Unknown';
+        fieldCounts[f] = (fieldCounts[f] || 0) + 1;
+    });
+
+    var avg = counted > 0 ? (sumOverall / counted).toFixed(1) : 0;
+    var avgSkills = counted > 0 ? Math.round(sumSkills / counted) : 0;
+    var avgEdu = counted > 0 ? Math.round(sumEdu / counted) : 0;
+    var avgExp = counted > 0 ? Math.round(sumExp / counted) : 0;
+    var avgFmt = counted > 0 ? Math.round(sumFmt / counted) : 0;
+
+    // field distribution sorted
+    var fields = [];
+    for (var f in fieldCounts) { fields.push({ field: f, count: fieldCounts[f] }); }
+    fields.sort(function(a, b) { return b.count - a.count; });
+
+    return {
+        total: total, avg: parseFloat(avg), counted: counted,
+        excellent: excellent, good: good, average: average, poor: poor,
+        high: high, medium: medium, low: low,
+        avgSkills: avgSkills, avgEdu: avgEdu, avgExp: avgExp, avgFmt: avgFmt,
+        fields: fields
+    };
+}
+
+// ===== Render EVERYTHING from stats =====
+function renderDashboard(filterField) {
+    // Filter rows
+    var rows = ALL_DATA;
+    if (filterField && filterField !== 'all') {
+        rows = ALL_DATA.filter(function(r) { return r.recommended_field === filterField; });
+    }
+    var st = computeStats(rows);
+
+    // --- Stat Cards ---
+    var statValues = document.querySelectorAll('.stat-value');
+    if (statValues.length >= 4) {
+        statValues[0].textContent = st.total;
+        statValues[1].textContent = st.avg;
+        statValues[2].textContent = ALL_SKILLS.length;
+        statValues[3].textContent = st.fields.length;
+    }
+
+    // --- 1. Score Distribution Doughnut ---
+    destroyChart('scoreDist');
+    var distLabels = ['Excellent', 'Good', 'Average', 'Needs Improvement'];
+    var distValues = [st.excellent, st.good, st.average, st.poor];
+    var distColors = ['#22c55e', '#0ea5e9', '#f59e0b', '#ef4444'];
+    var distTotal = distValues.reduce(function(a, b) { return a + b; }, 0);
+
+    charts['scoreDist'] = new Chart(document.getElementById('scoreDistChart'), {
+        type: 'doughnut',
+        data: { labels: distLabels, datasets: [{ data: distValues, backgroundColor: distColors, borderWidth: 2, borderColor: theme.bg }] },
+        options: {
+            responsive: true, cutout: '65%',
+            plugins: { legend: { display: false }, tooltip: { callbacks: {
+                label: function(ctx) { var pct = distTotal > 0 ? ((ctx.raw / distTotal) * 100).toFixed(1) : 0; return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)'; }
+            }}}
+        }
+    });
+
+    var legendHtml = '';
+    distLabels.forEach(function(l, i) {
+        var pct = distTotal > 0 ? ((distValues[i] / distTotal) * 100).toFixed(0) : 0;
+        legendHtml += '<div class="legend-item"><span class="legend-dot" style="background:' + distColors[i] + '"></span>' + l + ' <strong>' + distValues[i] + '</strong> (' + pct + '%)</div>';
+    });
+    document.getElementById('scoreLegend').innerHTML = legendHtml;
+
+    // --- 2. Top Skills Bar ---
+    var skillsCanvas = document.getElementById('topSkillsChart');
+    if (skillsCanvas && ALL_SKILLS.length > 0) {
+        destroyChart('topSkills');
+        var top10 = ALL_SKILLS.slice(0, 10);
+        charts['topSkills'] = new Chart(skillsCanvas, {
+            type: 'bar',
+            data: { labels: top10.map(function(s){ return s.skill_name; }),
+                    datasets: [{ label: 'Appears in', data: top10.map(function(s){ return s.frequency; }),
+                        backgroundColor: PALETTE, borderRadius: 6, barThickness: 22 }] },
+            options: { indexAxis: 'y', responsive: true,
+                scales: { x: { beginAtZero: true, grid: { color: theme.grid } }, y: { grid: { display: false } } },
+                plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { var pct = ((ctx.raw / Math.max(st.total, 1)) * 100).toFixed(1); return ctx.raw + ' resumes (' + pct + '%)'; } } } } }
+        });
+    }
+
+    // --- 4. Career Fields Pie ---
+    var fieldCanvas = document.getElementById('fieldPieChart');
+    if (fieldCanvas && st.fields.length > 0) {
+        destroyChart('fieldPie');
+        var fTotal = st.fields.reduce(function(a, b) { return a + b.count; }, 0);
+        charts['fieldPie'] = new Chart(fieldCanvas, {
+            type: 'pie',
+            data: { labels: st.fields.map(function(f){ return f.field; }),
+                    datasets: [{ data: st.fields.map(function(f){ return f.count; }),
+                        backgroundColor: PALETTE.slice(0, st.fields.length), borderWidth: 2, borderColor: theme.bg }] },
+            options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, padding: 10 } },
+                tooltip: { callbacks: { label: function(ctx) { var pct = fTotal > 0 ? ((ctx.raw / fTotal) * 100).toFixed(1) : 0; return ctx.label + ': ' + ctx.raw + ' (' + pct + '%)'; } } } } }
+        });
+    }
+
+    // --- 5. ATS Radar ---
+    destroyChart('atsRadar');
+    charts['atsRadar'] = new Chart(document.getElementById('atsRadarChart'), {
+        type: 'radar',
+        data: { labels: ['Skills', 'Education', 'Experience', 'Formatting'],
+                datasets: [{ label: 'Average Score', data: [st.avgSkills, st.avgEdu, st.avgExp, st.avgFmt],
+                    backgroundColor: 'rgba(79,70,229,0.2)', borderColor: '#4f46e5', pointBackgroundColor: '#4f46e5', pointRadius: 5, borderWidth: 2 }] },
+        options: { responsive: true,
+            scales: { r: { beginAtZero: true, max: 100, ticks: { stepSize: 20, backdropColor: 'transparent' }, grid: { color: theme.grid }, angleLines: { color: theme.grid }, pointLabels: { font: { size: 12, weight: 'bold' } } } },
+            plugins: { legend: { display: false } } }
+    });
+
+    // --- 6. Quality Bar ---
+    destroyChart('quality');
+    charts['quality'] = new Chart(document.getElementById('qualityChart'), {
+        type: 'bar',
+        data: { labels: ['High Quality (80+)', 'Medium (60-79)', 'Low Quality (<60)'],
+                datasets: [{ data: [st.high, st.medium, st.low], backgroundColor: ['#22c55e', '#f59e0b', '#ef4444'], borderRadius: 8, barThickness: 50 }] },
+        options: { responsive: true, scales: { y: { beginAtZero: true, ticks: { stepSize: 1 }, grid: { color: theme.grid } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } }
+    });
+
+    // --- 7. Actionable Insights Bar ---
+    destroyChart('action');
+    var improvements = [
+        { label: 'Add Relevant Skills', pts: Math.round((100 - st.avgSkills) * 0.35) },
+        { label: 'Improve Experience Details', pts: Math.round((100 - st.avgExp) * 0.30) },
+        { label: 'Add Education Info', pts: Math.round((100 - st.avgEdu) * 0.20) },
+        { label: 'Fix Formatting', pts: Math.round((100 - st.avgFmt) * 0.15) }
+    ];
+    improvements.sort(function(a, b) { return b.pts - a.pts; });
+    charts['action'] = new Chart(document.getElementById('actionChart'), {
+        type: 'bar',
+        data: { labels: improvements.map(function(i){ return i.label; }),
+                datasets: [{ label: 'Potential Score Boost', data: improvements.map(function(i){ return i.pts; }),
+                    backgroundColor: ['#14b8a6', '#0ea5e9', '#8b5cf6', '#f59e0b'], borderRadius: 6, barThickness: 30 }] },
+        options: { indexAxis: 'y', responsive: true,
+            scales: { x: { beginAtZero: true, grid: { color: theme.grid }, title: { display: true, text: 'Avg Points Gain', font: { size: 11 } } }, y: { grid: { display: false } } },
+            plugins: { legend: { display: false }, tooltip: { callbacks: { label: function(ctx) { return '+' + ctx.raw + ' points average improvement'; } } } } }
+    });
+
+    // --- 8. AI Insights ---
+    var panel = document.getElementById('aiInsights');
+    if (panel) {
+        var insights = [];
+        var filterLabel = (filterField && filterField !== 'all') ? ' in ' + filterField : '';
+
+        if (st.total === 0) {
+            panel.innerHTML = '<div class="insight-item"><span class="insight-icon info">i</span><p>No resumes found' + filterLabel + '.</p></div>';
+        } else {
+            if (ALL_SKILLS.length > 0) {
+                insights.push({ type: 'info', text: '"' + ALL_SKILLS[0].skill_name + '" is the most common skill, appearing in ' + ALL_SKILLS[0].frequency + ' resume' + (ALL_SKILLS[0].frequency > 1 ? 's' : '') + '.' });
+            }
+            var areas = [{ name: 'Skills', score: st.avgSkills }, { name: 'Education', score: st.avgEdu }, { name: 'Experience', score: st.avgExp }, { name: 'Formatting', score: st.avgFmt }];
+            areas.sort(function(a, b) { return a.score - b.score; });
+            if (areas[0].score < 60) {
+                insights.push({ type: 'warn', text: areas[0].name + ' is the weakest area' + filterLabel + ' (avg ' + areas[0].score + '/100). Candidates should focus on improving this.' });
+            }
+            var highPct = st.total > 0 ? ((st.high / st.total) * 100).toFixed(0) : 0;
+            var lowPct = st.total > 0 ? ((st.low / st.total) * 100).toFixed(0) : 0;
+            if (parseInt(lowPct) > 50) { insights.push({ type: 'danger', text: lowPct + '% of resumes' + filterLabel + ' scored below 60. Most candidates need significant improvements.' }); }
+            else if (parseInt(highPct) > 50) { insights.push({ type: 'success', text: highPct + '% of resumes' + filterLabel + ' scored 80+. Most candidates have strong resumes.' }); }
+            else { insights.push({ type: 'info', text: 'Resume quality' + filterLabel + ': ' + st.high + ' high, ' + st.medium + ' medium, ' + st.low + ' low.' }); }
+
+            if (st.avg >= 75) { insights.push({ type: 'success', text: 'Average score' + filterLabel + ' is ' + st.avg + '/100 — above industry standard.' }); }
+            else if (st.avg >= 50) { insights.push({ type: 'warn', text: 'Average score' + filterLabel + ' is ' + st.avg + '/100 — room for improvement.' }); }
+            else if (st.avg > 0) { insights.push({ type: 'danger', text: 'Average score' + filterLabel + ' is only ' + st.avg + '/100. Most resumes need work.' }); }
+
+            if (st.fields.length > 0 && (!filterField || filterField === 'all')) {
+                insights.push({ type: 'info', text: '"' + st.fields[0].field + '" is the most common career field (' + st.fields[0].count + ' resume' + (st.fields[0].count > 1 ? 's' : '') + ').' });
+            }
+            if (st.avgFmt > 0 && st.avgSkills > 0) {
+                if (st.avgFmt > st.avgSkills + 15) { insights.push({ type: 'warn', text: 'Resumes' + filterLabel + ' have better formatting than content. Focus on adding relevant skills.' }); }
+                else if (st.avgSkills > st.avgFmt + 15) { insights.push({ type: 'warn', text: 'Resumes' + filterLabel + ' have strong content but poor formatting. Clean layouts would help.' }); }
+            }
+
+            var html = '';
+            insights.forEach(function(item) {
+                var icons = { info: 'i', warn: '!', danger: '!!', success: '&#10003;' };
+                html += '<div class="insight-item"><span class="insight-icon ' + item.type + '">' + (icons[item.type] || 'i') + '</span><p>' + item.text + '</p></div>';
+            });
+            panel.innerHTML = html;
+        }
+    }
+
+    // --- 9. Table Filter ---
+    var tableRows = document.querySelectorAll('.recent-table tbody tr');
+    tableRows.forEach(function(row) {
+        if (!filterField || filterField === 'all') {
+            row.style.display = '';
+        } else {
+            var fieldCell = row.cells[6];
+            row.style.display = (fieldCell && fieldCell.textContent.trim() === filterField) ? '' : 'none';
+        }
+    });
+}
+
+// ===== Field Filter Handler =====
+function filterDashboard() {
+    var field = document.getElementById('field-filter').value;
+    renderDashboard(field);
+}
+
+// ===== Initial Render =====
+renderDashboard('all');
+</script>
 {% endblock %}

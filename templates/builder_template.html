@@ -1,0 +1,363 @@
+{% extends "base.html" %}
+{% block title %}Resume Template - Smart Resume Analyser{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>Resume Template</h2>
+    <p>Follow each section below. Fill in your details using the guidance and examples provided.</p>
+</div>
+
+<!-- Step-by-step sections -->
+<div class="builder-steps">
+    {% for section in template.sections %}
+    <div class="builder-step card">
+        <div class="step-header">
+            <div class="step-number">Step {{ loop.index }}</div>
+            <h3>{{ section.name }}</h3>
+        </div>
+        <div class="step-body">
+            <div class="step-hint">
+                <strong>What to include:</strong>
+                <pre class="hint-example">{{ section.hint }}</pre>
+            </div>
+            <div class="form-group">
+                <label for="section-{{ loop.index }}">Your {{ section.name }}</label>
+                <textarea id="section-{{ loop.index }}" class="builder-textarea" rows="5"
+                          spellcheck="true" lang="en"
+                          placeholder="Type your {{ section.name|lower }} here..."></textarea>
+                <div class="spell-status" id="spell-status-{{ loop.index }}"></div>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Preview & Actions -->
+<div class="card" style="margin-top:1.5rem;">
+    <div class="card-header">Preview & Export</div>
+    <div id="resume-preview" class="resume-preview">
+        <p style="color:var(--gray-400);text-align:center;">Start filling in the sections above to see your resume preview here.</p>
+    </div>
+    <div style="text-align:center;margin-top:1.5rem;display:flex;gap:0.75rem;justify-content:center;flex-wrap:wrap;">
+        <button id="clean-btn" class="btn btn-secondary" onclick="cleanAllTextareas()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;">
+                <path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm5.854 8.803l-2.5 2.5a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L5 11.293l2.146-2.147a.5.5 0 0 1 .708.657z"/>
+            </svg>
+            Clean Writing
+        </button>
+        <button id="preview-btn" class="btn btn-secondary" onclick="generatePreview()">Update Preview</button>
+        <button id="copy-btn" class="btn btn-primary" onclick="copyResume()">Copy to Clipboard</button>
+        <button id="export-btn" class="btn btn-primary" onclick="exportPDF()" style="background:var(--success);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;">
+                <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+                <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+            </svg>
+            Export as PDF
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- html2pdf.js library for PDF generation -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function generatePreview() {
+    var textareas = document.querySelectorAll('.builder-textarea');
+    var steps = document.querySelectorAll('.builder-step h3');
+    var preview = document.getElementById('resume-preview');
+    var html = '';
+    var hasContent = false;
+
+    for (var i = 0; i < textareas.length; i++) {
+        var content = textareas[i].value.trim();
+        if (content) {
+            hasContent = true;
+            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
+            html += '<div class="preview-section">';
+            html += '<h4>' + title + '</h4>';
+            html += '<p>' + content.replace(/\n/g, '<br>') + '</p>';
+            html += '</div>';
+        }
+    }
+
+    if (!hasContent) {
+        html = '<p style="color:var(--gray-400);text-align:center;">Fill in the sections above to see your preview.</p>';
+    }
+    preview.innerHTML = html;
+}
+
+function copyResume() {
+    var textareas = document.querySelectorAll('.builder-textarea');
+    var steps = document.querySelectorAll('.builder-step h3');
+    var text = '';
+
+    for (var i = 0; i < textareas.length; i++) {
+        var content = textareas[i].value.trim();
+        if (content) {
+            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
+            text += title.toUpperCase() + '\n';
+            text += content + '\n\n';
+        }
+    }
+
+    if (!text) {
+        alert('Please fill in at least one section first.');
+        return;
+    }
+
+    navigator.clipboard.writeText(text).then(function() {
+        var btn = document.getElementById('copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(function() { btn.textContent = 'Copy to Clipboard'; }, 2000);
+    });
+}
+
+function exportPDF() {
+    generatePreview();
+
+    var textareas = document.querySelectorAll('.builder-textarea');
+    var steps = document.querySelectorAll('.builder-step h3');
+    var hasContent = false;
+
+    for (var i = 0; i < textareas.length; i++) {
+        if (textareas[i].value.trim()) { hasContent = true; break; }
+    }
+
+    if (!hasContent) {
+        alert('Please fill in at least one section first.');
+        return;
+    }
+
+    // Create a full-screen white overlay so html2canvas can render on-screen content
+    var overlay = document.createElement('div');
+    overlay.id = 'pdf-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
+
+    var pdfContent = document.createElement('div');
+    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;padding:40px 50px;line-height:1.6;background:#ffffff;max-width:8.5in;margin:0 auto;';
+
+    for (var i = 0; i < textareas.length; i++) {
+        var content = textareas[i].value.trim();
+        if (content) {
+            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
+
+            var sectionDiv = document.createElement('div');
+            sectionDiv.style.cssText = 'margin-bottom:18px;';
+
+            var heading = document.createElement('h3');
+            heading.textContent = title;
+            heading.style.cssText = 'font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #4361ee;padding-bottom:5px;margin-bottom:10px;margin-top:0;color:#1a1a2e;';
+
+            var para = document.createElement('div');
+            para.style.cssText = 'font-size:12px;margin:0;color:#333333;line-height:1.7;';
+
+            var lines = content.split('\n');
+            for (var j = 0; j < lines.length; j++) {
+                var lineEl = document.createElement('p');
+                lineEl.textContent = lines[j];
+                lineEl.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
+                if (lines[j].trim() === '') {
+                    lineEl.style.margin = '8px 0';
+                }
+                para.appendChild(lineEl);
+            }
+
+            sectionDiv.appendChild(heading);
+            sectionDiv.appendChild(para);
+            pdfContent.appendChild(sectionDiv);
+        }
+    }
+
+    overlay.appendChild(pdfContent);
+    document.body.appendChild(overlay);
+
+    // Get the name from the first textarea for the filename
+    var nameField = textareas[0] ? textareas[0].value.trim().split('\n')[0] : 'Resume';
+    var fileName = (nameField || 'Resume').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_') || 'Resume';
+    if (fileName.length > 40) fileName = fileName.substring(0, 40);
+
+    var btn = document.getElementById('export-btn');
+    var originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:-2px;margin-right:6px;"></span> Generating PDF...';
+    btn.disabled = true;
+
+    var opt = {
+        margin:       [0.4, 0.5, 0.4, 0.5],
+        filename:     fileName + '_Resume.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0, windowWidth: overlay.scrollWidth },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    // Small delay to let the browser paint the overlay before capturing
+    setTimeout(function() {
+        html2pdf().set(opt).from(pdfContent).save().then(function() {
+            document.body.removeChild(overlay);
+            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg> Exported!';
+            setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000);
+        }).catch(function(err) {
+            console.error('PDF generation failed:', err);
+            var el = document.getElementById('pdf-overlay');
+            if (el) document.body.removeChild(el);
+            btn.innerHTML = 'Export Failed - Try Again';
+            btn.disabled = false;
+            setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
+        });
+    }, 100);
+}
+
+// ---------- Grammar & Spell Check ----------
+function cleanWriting(text) {
+    var cleaned = text;
+
+    // Protect emails, URLs, and special tokens from being mangled
+    var preserved = [];
+    cleaned = cleaned.replace(/[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}/g, function(match) {
+        preserved.push(match);
+        return '%%PRESERVE' + (preserved.length - 1) + '%%';
+    });
+    cleaned = cleaned.replace(/https?:\/\/[^\s]+/g, function(match) {
+        preserved.push(match);
+        return '%%PRESERVE' + (preserved.length - 1) + '%%';
+    });
+    cleaned = cleaned.replace(/www\.[^\s]+/g, function(match) {
+        preserved.push(match);
+        return '%%PRESERVE' + (preserved.length - 1) + '%%';
+    });
+
+    // Fix double spaces
+    cleaned = cleaned.replace(/  +/g, ' ');
+
+    // Capitalize first letter of each sentence
+    cleaned = cleaned.replace(/(^|[.!?]\s+)([a-z])/gm, function(match, prefix, letter) {
+        return prefix + letter.toUpperCase();
+    });
+
+    // Capitalize first letter of each line
+    cleaned = cleaned.replace(/^([a-z])/gm, function(match, letter) {
+        return letter.toUpperCase();
+    });
+
+    // Fix common typos / misspellings
+    var typos = {
+        'teh': 'the', 'adn': 'and', 'taht': 'that', 'wiht': 'with',
+        'hte': 'the', 'recieve': 'receive', 'acheive': 'achieve',
+        'occured': 'occurred', 'seperate': 'separate', 'definately': 'definitely',
+        'accomodate': 'accommodate', 'occassion': 'occasion', 'neccessary': 'necessary',
+        'succesful': 'successful', 'proffesional': 'professional', 'managment': 'management',
+        'responsibilty': 'responsibility', 'developement': 'development',
+        'enviroment': 'environment', 'comunication': 'communication',
+        'independant': 'independent', 'expereince': 'experience', 'experiance': 'experience',
+        'knowlege': 'knowledge', 'languange': 'language', 'maintainance': 'maintenance',
+        'preformance': 'performance', 'recomendation': 'recommendation',
+        'strenght': 'strength', 'strenghts': 'strengths', 'technolgy': 'technology',
+        'undrestand': 'understand', 'writting': 'writing', 'wich': 'which',
+        'becuase': 'because', 'beleive': 'believe', 'calender': 'calendar',
+        'collegue': 'colleague', 'comittee': 'committee', 'completly': 'completely',
+        'consciencious': 'conscientious', 'consistant': 'consistent',
+        'curriculm': 'curriculum', 'efficent': 'efficient', 'excellant': 'excellent',
+        'excercise': 'exercise', 'foriegn': 'foreign', 'goverment': 'government',
+        'immediatly': 'immediately', 'liason': 'liaison', 'occurance': 'occurrence',
+        'persistant': 'persistent', 'posession': 'possession', 'priviledge': 'privilege',
+        'pronounciation': 'pronunciation', 'publically': 'publicly',
+        'referencs': 'references', 'relevent': 'relevant', 'responsable': 'responsible',
+        'succesfully': 'successfully', 'transfered': 'transferred',
+        'manageable': 'manageable', 'judgement': 'judgment'
+    };
+
+    Object.keys(typos).forEach(function(wrong) {
+        var regex = new RegExp('\\b' + wrong + '\\b', 'gi');
+        cleaned = cleaned.replace(regex, function(match) {
+            // Preserve original case pattern
+            var fix = typos[wrong];
+            if (match[0] === match[0].toUpperCase()) {
+                return fix.charAt(0).toUpperCase() + fix.slice(1);
+            }
+            return fix;
+        });
+    });
+
+    // Fix missing space after punctuation
+    cleaned = cleaned.replace(/([.!?,;:])([A-Za-z])/g, '$1 $2');
+
+    // Fix repeated punctuation (.. or ,, but not ... ellipsis)
+    cleaned = cleaned.replace(/([.!?,;:])\1{1}(?!\1)/g, '$1');
+
+    // Remove trailing spaces on each line
+    cleaned = cleaned.replace(/[ \t]+$/gm, '');
+
+    // Fix common grammar: "i" -> "I" standalone
+    cleaned = cleaned.replace(/\bi\b(?=[^.])/g, 'I');
+    // But be careful with roman numerals and variable names - only fix standalone "i"
+    cleaned = cleaned.replace(/(^|\s)i(\s|[',.])/gm, '$1I$2');
+
+    // Restore preserved emails and URLs
+    for (var p = 0; p < preserved.length; p++) {
+        cleaned = cleaned.replace('%%PRESERVE' + p + '%%', preserved[p]);
+    }
+
+    return cleaned;
+}
+
+function cleanAllTextareas() {
+    var textareas = document.querySelectorAll('.builder-textarea');
+    var totalFixes = 0;
+
+    textareas.forEach(function(ta, index) {
+        var original = ta.value;
+        if (!original.trim()) return;
+
+        var cleaned = cleanWriting(original);
+        if (cleaned !== original) {
+            // Count approximate fixes
+            var fixes = 0;
+            for (var c = 0; c < Math.max(original.length, cleaned.length); c++) {
+                if (original[c] !== cleaned[c]) fixes++;
+            }
+            totalFixes += Math.max(1, Math.floor(fixes / 3));
+            ta.value = cleaned;
+
+            // Flash the status
+            var status = document.getElementById('spell-status-' + (index + 1));
+            if (status) {
+                status.textContent = 'Cleaned!';
+                status.className = 'spell-status spell-ok';
+                setTimeout(function() { status.textContent = ''; status.className = 'spell-status'; }, 2500);
+            }
+        }
+    });
+
+    // Update the preview
+    generatePreview();
+
+    var btn = document.getElementById('clean-btn');
+    if (totalFixes > 0) {
+        btn.textContent = 'Cleaned ' + totalFixes + ' issue' + (totalFixes > 1 ? 's' : '') + '!';
+        btn.style.background = 'var(--success)';
+    } else {
+        btn.textContent = 'Writing looks clean!';
+        btn.style.background = 'var(--success)';
+    }
+    setTimeout(function() {
+        btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;"><path d="M2 1a1 1 0 0 0-1 1v12a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V2a1 1 0 0 0-1-1H2zm5.854 8.803l-2.5 2.5a.5.5 0 0 1-.708 0l-1.5-1.5a.5.5 0 1 1 .708-.708L5 11.293l2.146-2.147a.5.5 0 0 1 .708.657z"/></svg> Clean Writing';
+        btn.style.background = '';
+    }, 2500);
+}
+
+// Auto-preview on input
+document.querySelectorAll('.builder-textarea').forEach(function(ta) {
+    ta.addEventListener('input', generatePreview);
+});
+
+
+</script>
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+#export-btn:disabled { opacity: 0.7; cursor: wait; }
+.spell-status { font-size: 0.8rem; margin-top: 4px; min-height: 1.2em; transition: all 0.3s; }
+.spell-ok { color: var(--success); font-weight: 600; }
+.spell-warn { color: var(--warning); font-weight: 600; }
+</style>
+{% endblock %}
