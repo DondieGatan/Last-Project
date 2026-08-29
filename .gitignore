@@ -2,3 +2,6 @@ __pycache__/
 *.pyc
 venv/
 static/uploads/
+*.log
+.vite/
+.claude/settings.local.json
