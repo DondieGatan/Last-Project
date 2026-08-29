@@ -1506,14 +1506,15 @@ table tr:hover { background: var(--gray-50); }
     display: inline-block;
     padding: 0.2rem 0.6rem;
     border-radius: 12px;
-    font-weight: 600;
+    font-weight: 700;
     font-size: 0.85rem;
+    border: 1px solid transparent;
 }
 
-.score-badge.excellent { background: #d1fae5; color: #047857; }
-.score-badge.good { background: #dbeafe; color: #1d4ed8; }
-.score-badge.average { background: #fef3c7; color: #b45309; }
-.score-badge.poor { background: #fee2e2; color: #dc2626; }
+.score-badge.excellent { color: #22c55e; background: rgba(34,197,94,0.14); border-color: rgba(34,197,94,0.4); }
+.score-badge.good { color: #ca8a04; background: rgba(234,179,8,0.16); border-color: rgba(234,179,8,0.4); }
+.score-badge.average { color: #f97316; background: rgba(249,115,22,0.14); border-color: rgba(249,115,22,0.4); }
+.score-badge.poor { color: #ef4444; background: rgba(239,68,68,0.14); border-color: rgba(239,68,68,0.4); }
 
 /* ---------- Dashboard ---------- */
 .stats-grid {
@@ -1524,12 +1525,14 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .stat-card {
-    background: white;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     border-radius: var(--radius);
     padding: 1.5rem;
     text-align: center;
     box-shadow: var(--shadow);
-    border: 1px solid var(--gray-200);
+    border: 1px solid rgba(255,255,255,0.6);
 }
 
 .stat-card .stat-value {
@@ -1551,12 +1554,21 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .chart-card {
-    background: white;
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
     border-radius: var(--radius);
     box-shadow: var(--shadow);
-    border: 1px solid var(--gray-200);
+    border: 1px solid rgba(255,255,255,0.6);
     padding: 1.5rem;
     min-width: 0;
+}
+
+.dash-glass-card {
+    background: rgba(255,255,255,0.5);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.6);
 }
 
 .chart-container {
@@ -1587,7 +1599,7 @@ table tr:hover { background: var(--gray-50); }
 .bar-chart {
     display: flex;
     flex-direction: column;
-    gap: 0.6rem;
+    gap: 0.85rem;
 }
 
 .bar-row {
@@ -1597,41 +1609,80 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .bar-row .bar-label {
-    width: 120px;
+    width: 140px;
     font-size: 0.85rem;
     color: var(--gray-600);
     text-align: right;
     flex-shrink: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .bar-row .bar-track {
     flex: 1;
-    height: 22px;
+    height: 8px;
     background: var(--gray-100);
-    border-radius: 4px;
+    border-radius: 999px;
     overflow: hidden;
 }
 
-.bar-row .bar-fill {
+.bar-row .dash-bar-fill {
     height: 100%;
-    border-radius: 4px;
-    transition: width 1s ease;
-    display: flex;
-    align-items: center;
-    padding-left: 8px;
-    font-size: 0.75rem;
-    color: white;
-    font-weight: 600;
+    border-radius: 999px;
+    background: #3b82f6;
 }
 
-.bar-fill.color-1 { background: var(--primary); }
-.bar-fill.color-2 { background: var(--secondary); }
-.bar-fill.color-3 { background: var(--success); }
-.bar-fill.color-4 { background: var(--warning); }
-.bar-fill.color-5 { background: #8b5cf6; }
-.bar-fill.color-6 { background: #ec4899; }
-.bar-fill.color-7 { background: #14b8a6; }
-.bar-fill.color-8 { background: #f97316; }
+.bar-row .bar-value {
+    width: 32px;
+    text-align: right;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: var(--dark);
+    flex-shrink: 0;
+}
+
+/* ---------- Score Distribution Stacked Bar ---------- */
+.stacked-bar-track {
+    display: flex;
+    width: 100%;
+    height: 10px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--gray-100);
+}
+
+.stacked-bar-seg {
+    height: 100%;
+}
+
+/* ---------- ATS Ring Gauges ---------- */
+.ring-gauge-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 1rem;
+    padding-top: 0.5rem;
+}
+
+.ring-gauge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.ring-gauge .ring-value {
+    font-size: 1.4rem;
+    font-weight: 800;
+    color: var(--dark);
+}
+
+.ring-gauge .ring-label {
+    font-size: 0.85rem;
+    color: var(--gray-500);
+}
 
 /* ---------- Power BI Section ---------- */
 .powerbi-section {
@@ -1683,11 +1734,16 @@ table tr:hover { background: var(--gray-50); }
     color: #e2e8f0;
 }
 
+[data-theme="dark"] .dash-filters select option {
+    background: #1e1f22;
+    color: #e2e8f0;
+}
+
 /* ---------- Stat Card Icons ---------- */
 .stat-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
     background: rgba(79,70,229,0.12);
     color: var(--primary);
     display: flex;
@@ -1769,8 +1825,10 @@ table tr:hover { background: var(--gray-50); }
     gap: 0.75rem;
     padding: 0.75rem;
     border-radius: 8px;
-    background: var(--gray-50);
-    border: 1px solid var(--gray-200);
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.5);
     transition: transform 0.15s;
 }
 
@@ -1779,8 +1837,10 @@ table tr:hover { background: var(--gray-50); }
 }
 
 [data-theme="dark"] .insight-item {
-    background: #1e1f22;
-    border-color: #47484c;
+    background: rgba(255,255,255,0.035);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    border-color: rgba(255,255,255,0.08);
 }
 
 .insight-icon {
@@ -1797,9 +1857,9 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .insight-icon.info { background: var(--primary); }
-.insight-icon.success { background: var(--success); }
-.insight-icon.warn { background: var(--warning); }
-.insight-icon.danger { background: var(--danger); }
+.insight-icon.success { background: #22c55e; }
+.insight-icon.warn { background: #f59e0b; }
+.insight-icon.danger { background: #ef4444; }
 
 .insight-item p {
     margin: 0;
@@ -1853,9 +1913,13 @@ table tr:hover { background: var(--gray-50); }
 .mini-bar-track {
     width: 60px;
     height: 6px;
-    background: var(--gray-200);
+    background: rgba(0,0,0,0.08);
     border-radius: 3px;
     overflow: hidden;
+}
+
+[data-theme="dark"] .mini-bar-track {
+    background: rgba(255,255,255,0.1);
 }
 
 .mini-bar-fill {
@@ -1866,7 +1930,10 @@ table tr:hover { background: var(--gray-50); }
 
 .score-pill {
     display: inline-block;
-    background: var(--gray-100);
+    background: rgba(255,255,255,0.4);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.5);
     color: var(--gray-700);
     padding: 2px 8px;
     border-radius: 12px;
@@ -1875,29 +1942,28 @@ table tr:hover { background: var(--gray-50); }
 }
 
 [data-theme="dark"] .score-pill {
-    background: #47484c;
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    border-color: rgba(255,255,255,0.1);
     color: #e2e8f0;
 }
 
 .field-tag {
     display: inline-block;
-    background: var(--gray-100);
-    color: var(--dark);
+    background: rgba(129,140,248,0.14);
+    color: #818cf8;
+    border: 1px solid rgba(129,140,248,0.35);
     padding: 2px 10px;
     border-radius: 12px;
     font-size: 0.8rem;
-    font-weight: 500;
-}
-
-[data-theme="dark"] .field-tag {
-    background: rgba(255,255,255,0.08);
-    color: #e2e8f0;
+    font-weight: 600;
 }
 
 .btn-view {
     display: inline-block;
     padding: 4px 12px;
-    background: var(--primary);
+    background: #0ea5e9;
     color: white;
     border-radius: 6px;
     font-size: 0.78rem;
@@ -1907,7 +1973,7 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .btn-view:hover {
-    background: var(--primary-dark);
+    background: #38bdf8;
     transform: scale(1.05);
 }
 
@@ -2179,8 +2245,10 @@ table tr:hover { background: var(--gray-50); }
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    background: rgba(255,255,255,0.035);
-    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.06);
+    backdrop-filter: blur(12px) saturate(140%);
+    -webkit-backdrop-filter: blur(12px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.1);
     color: #fff;
     padding: 0.6rem 0.9rem;
     border-radius: 12px;
@@ -2193,8 +2261,8 @@ table tr:hover { background: var(--gray-50); }
 }
 
 .sidebar-theme-toggle:hover {
-    background: rgba(255,255,255,0.08);
-    border-color: rgba(255,255,255,0.14);
+    background: rgba(255,255,255,0.1);
+    border-color: rgba(255,255,255,0.18);
 }
 
 .theme-switch {
@@ -2202,9 +2270,11 @@ table tr:hover { background: var(--gray-50); }
     width: 40px;
     height: 22px;
     border-radius: 999px;
-    background: linear-gradient(160deg, #2c2c2f 0%, #0a0a0b 100%);
-    border: 1px solid rgba(255,255,255,0.16);
-    box-shadow: inset 0 1px 3px rgba(0,0,0,0.6);
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(8px) saturate(140%);
+    -webkit-backdrop-filter: blur(8px) saturate(140%);
+    border: 1px solid rgba(255,255,255,0.2);
+    box-shadow: inset 0 1px 3px rgba(0,0,0,0.4);
     flex-shrink: 0;
 }
 
@@ -2486,6 +2556,32 @@ body.auth-page {
     background-position: center;
     background-repeat: no-repeat;
     background-attachment: fixed;
+}
+
+/* =============================================
+   App Pages Background (Upload, Builder, History, Dashboard)
+   ============================================= */
+
+body.app-bg-page {
+    background-image: linear-gradient(rgba(233,233,235,0.55), rgba(233,233,235,0.55)), url('../images/Background_LastProject.jpg');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+[data-theme="dark"] body.app-bg-page {
+    background-image: linear-gradient(rgba(30,31,34,0.4), rgba(30,31,34,0.4)), url('../images/Background_LastProject.jpg');
+}
+
+body.app-bg-page .app-topbar {
+    background: rgba(255,255,255,0.35);
+    backdrop-filter: blur(16px) saturate(140%);
+    -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+[data-theme="dark"] body.app-bg-page .app-topbar {
+    background: rgba(255,255,255,0.035);
 }
 
 .auth-container {
