@@ -104,6 +104,7 @@
     </div>
     {% else %}
 
+    {% if not hide_navbar %}
     <!-- Navbar -->
     <header class="navbar">
         <div class="container">
@@ -124,6 +125,7 @@
             </nav>
         </div>
     </header>
+    {% endif %}
 
     {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
