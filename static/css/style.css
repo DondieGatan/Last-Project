@@ -2405,16 +2405,33 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     justify-content: center;
     min-height: calc(100vh - 180px);
     padding: 2rem 1rem;
+    background: radial-gradient(ellipse 800px 500px at 50% 0%, rgba(99,102,241,0.06), transparent);
 }
 
 .auth-card {
     background: var(--gray-50);
-    border-radius: var(--radius);
+    border-radius: 20px;
     box-shadow: var(--shadow-lg);
     width: 100%;
-    max-width: 440px;
-    padding: 2.5rem 2rem;
+    max-width: 420px;
+    padding: 2.5rem 2.25rem;
     border: 1px solid var(--gray-200);
+}
+
+.auth-icon-badge {
+    width: 56px;
+    height: 56px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    box-shadow: 0 8px 16px -6px rgba(79,70,229,0.45);
+}
+
+.auth-icon-badge svg {
+    color: white;
 }
 
 .auth-header {
@@ -2422,15 +2439,11 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     margin-bottom: 2rem;
 }
 
-.auth-header svg {
-    margin-bottom: 0.75rem;
-}
-
 .auth-header h2 {
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 800;
     color: var(--dark);
-    margin: 0 0 0.25rem 0;
+    margin: 0 0 0.35rem 0;
 }
 
 .auth-header p {
@@ -2446,11 +2459,12 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
 }
 
 .auth-field label {
-    display: block;
-    font-weight: 600;
-    font-size: 0.85rem;
-    color: var(--gray-600);
-    margin-bottom: 0.4rem;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
 }
 
 .auth-input-wrap {
@@ -2458,8 +2472,8 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     align-items: center;
     background: white;
     border: 2px solid var(--gray-200);
-    border-radius: 8px;
-    padding: 0 12px;
+    border-radius: 12px;
+    padding: 0 14px;
     transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -2577,7 +2591,7 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     padding: 0.85rem;
     font-size: 1rem;
     font-weight: 700;
-    border-radius: 8px;
+    border-radius: 12px;
 }
 
 .auth-footer {
@@ -2587,6 +2601,13 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     border-top: 1px solid var(--gray-200);
     color: var(--gray-500);
     font-size: 0.9rem;
+}
+
+.auth-switch {
+    text-align: center;
+    color: var(--gray-500);
+    font-size: 0.88rem;
+    margin: -1rem 0 1.75rem;
 }
 
 /* ---------- User Menu in Navbar ---------- */
