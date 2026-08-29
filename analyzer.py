@@ -2991,3 +2991,23 @@ RESUME_TEMPLATES = {
         ],
     },
 }
+
+
+def highlight_matches(raw_text, skill_names):
+    """HTML-escape raw resume text and wrap case-insensitive, word-boundary
+    matches of each skill name in <mark> tags, so the caller can render it
+    with |safe. Longest names are matched first via a single alternation
+    pass so multi-word skills aren't shadowed by a shorter substring skill
+    and nothing gets double-wrapped."""
+    from markupsafe import escape
+    if not raw_text:
+        return ''
+    escaped = str(escape(raw_text))
+    names = sorted({s for s in skill_names if s}, key=len, reverse=True)
+    if not names:
+        return escaped
+    pattern = re.compile(
+        r'(?<!\w)(' + '|'.join(re.escape(n) for n in names) + r')(?!\w)',
+        re.IGNORECASE
+    )
+    return pattern.sub(r'<mark>\1</mark>', escaped)

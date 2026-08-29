@@ -338,6 +338,40 @@ h1, h2, h3, .card-header, .dash-header h2 {
     border: 1px solid var(--gray-200);
 }
 
+/* ---------- Highlighted Resume Text (skill match explainability) ---------- */
+.raw-text-block {
+    max-height: 420px;
+    overflow-y: auto;
+    padding: 1.25rem;
+    background: var(--gray-50);
+    border: 1px solid var(--gray-200);
+    border-radius: 10px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 0.9rem;
+    line-height: 1.7;
+    color: var(--gray-700);
+}
+
+.raw-text-block mark {
+    background: rgba(79,70,229,0.16);
+    color: var(--primary);
+    border-radius: 3px;
+    padding: 0 3px;
+    font-weight: 600;
+}
+
+[data-theme="dark"] .raw-text-block {
+    background: rgba(255,255,255,0.03);
+    border-color: rgba(255,255,255,0.08);
+    color: #cbd5e1;
+}
+
+[data-theme="dark"] .raw-text-block mark {
+    background: rgba(99,102,241,0.25);
+    color: #a5b4fc;
+}
+
 .card-header {
     font-size: 1.25rem;
     font-weight: 700;
@@ -495,6 +529,15 @@ h1, h2, h3, .card-header, .dash-header h2 {
 .btn-success {
     background: var(--success);
     color: white;
+}
+
+.btn-danger {
+    background: var(--danger);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: #dc2626;
 }
 
 .btn-sm {
@@ -2333,6 +2376,30 @@ table tr:hover { background: var(--gray-50); }
     background: rgba(239,68,68,0.2);
     border-color: rgba(239,68,68,0.4);
     color: #fff;
+}
+
+.sidebar-danger-link {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    width: 100%;
+    padding: 0.6rem 0.9rem;
+    margin-top: 0.4rem;
+    border-radius: 12px;
+    background: none;
+    border: 1px solid transparent;
+    color: rgba(239,68,68,0.55);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.sidebar-danger-link:hover {
+    background: rgba(239,68,68,0.14);
+    border-color: rgba(239,68,68,0.35);
+    color: #f87171;
 }
 
 /* ---------- Sidebar collapsed (icon-only) state ---------- */

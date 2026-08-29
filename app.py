@@ -2,6 +2,7 @@ import os
 import csv
 import io
 import json
+import secrets
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, Response, send_from_directory, session)
@@ -9,12 +10,14 @@ from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
 from config import Config
 from analyzer import (analyse_resume, IMAGE_EXTENSIONS, generate_personalized_feedback,
-                      match_job_description, RESUME_TEMPLATES, SKILLS_DB)
+                      match_job_description, RESUME_TEMPLATES, SKILLS_DB, highlight_matches)
 from models import (save_resume, save_skills, save_education, save_experience,
                     save_analysis_results, get_resume_by_id, get_all_resumes,
                     get_dashboard_data, init_users_table, register_user,
                     authenticate_user, get_user_by_id, get_user_by_email,
-                    create_reset_code, verify_reset_code, reset_user_password)
+                    create_reset_code, verify_reset_code, reset_user_password,
+                    ensure_schema_migrations, delete_resume, delete_account,
+                    get_resume_filenames_for_user, user_owns_file)
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -35,10 +38,41 @@ try:
 except Exception:
     pass  # Table may already exist or DB not yet available
 
+# Idempotent schema migrations (adds resumes.user_id for per-user data
+# isolation, backfills existing rows, recreates the dashboard view)
+try:
+    ensure_schema_migrations()
+except Exception:
+    pass  # DB not yet available at import time
+
 
 def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_EXTENSIONS
+
+
+def validate_file_content(filepath, extension):
+    """Cheap content sniff on top of the extension check — a renamed file
+    (e.g. a script saved as photo.jpg) shouldn't make it past upload just
+    because the extension looks right. Returns True if the content matches
+    what the extension claims."""
+    if extension in IMAGE_EXTENSIONS:
+        try:
+            from PIL import Image
+            with Image.open(filepath) as img:
+                img.verify()
+            return True
+        except Exception:
+            return False
+    if extension == 'pdf':
+        try:
+            with open(filepath, 'rb') as f:
+                return f.read(5) == b'%PDF-'
+        except OSError:
+            return False
+    # .docx is a zip container — python-docx will raise on a bad one at
+    # parse time, which analyse_resume() already surfaces as an error.
+    return True
 
 
 # --------------------------------------------------------------------------
@@ -269,9 +303,19 @@ def upload_resume():
         flash('Only PDF, Word (.docx), and image files (PNG, JPG, BMP, TIFF) are allowed.', 'error')
         return redirect(url_for('index'))
 
-    filename = secure_filename(file.filename)
+    original_filename = secure_filename(file.filename)
+    extension = original_filename.rsplit('.', 1)[1].lower()
+    # Prefix with a random token — two users uploading a file with the same
+    # original name (e.g. "resume.pdf") would otherwise overwrite each
+    # other's file on disk since storage isn't namespaced per user.
+    filename = f"{secrets.token_hex(8)}_{original_filename}"
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
     file.save(filepath)
+
+    if not validate_file_content(filepath, extension):
+        os.remove(filepath)
+        flash("That file's content doesn't match its extension — please upload a genuine PDF, Word, or image file.", 'error')
+        return redirect(url_for('index'))
 
     try:
         # Analyse the resume
@@ -284,7 +328,7 @@ def upload_resume():
         # Save to database
         resume_id = save_resume(
             result['name'], result['email'], result['phone'],
-            filename, result['raw_text']
+            filename, result['raw_text'], session['user_id']
         )
 
         save_skills(resume_id, result['skills'])
@@ -323,7 +367,7 @@ def upload_resume():
 @login_required
 def result(resume_id):
     """Display analysis results for a specific resume."""
-    resume = get_resume_by_id(resume_id)
+    resume = get_resume_by_id(resume_id, session['user_id'])
     if not resume:
         flash('Resume not found.', 'error')
         return redirect(url_for('index'))
@@ -368,7 +412,13 @@ def result(resume_id):
         for category, skills in by_cat.items():
             skills_by_category.append((category, skills))
 
-    return render_template('result.html', resume=resume, skills_by_category=skills_by_category)
+    highlighted_text = highlight_matches(
+        resume.get('raw_text', ''),
+        [s['skill_name'] for s in resume.get('skills', [])]
+    )
+
+    return render_template('result.html', resume=resume, skills_by_category=skills_by_category,
+                           highlighted_text=highlighted_text)
 
 
 # --------------------------------------------------------------------------
@@ -379,7 +429,7 @@ def result(resume_id):
 @login_required
 def personalize(resume_id):
     """Context-aware personalized feedback page."""
-    resume = get_resume_by_id(resume_id)
+    resume = get_resume_by_id(resume_id, session['user_id'])
     if not resume:
         flash('Resume not found.', 'error')
         return redirect(url_for('index'))
@@ -438,7 +488,7 @@ def personalize(resume_id):
 @login_required
 def job_match(resume_id):
     """Compare resume against a job description."""
-    resume = get_resume_by_id(resume_id)
+    resume = get_resume_by_id(resume_id, session['user_id'])
     if not resume:
         flash('Resume not found.', 'error')
         return redirect(url_for('index'))
@@ -491,8 +541,8 @@ def builder_template(template_id):
 @app.route('/history')
 @login_required
 def history():
-    """Show all previously analysed resumes."""
-    resumes = get_all_resumes()
+    """Show the current user's previously analysed resumes."""
+    resumes = get_all_resumes(session['user_id'])
     return render_template('history.html', resumes=resumes)
 
 
@@ -501,7 +551,7 @@ def history():
 def dashboard():
     """Dashboard page with analytics and Power BI integration."""
     try:
-        data = get_dashboard_data()
+        data = get_dashboard_data(session['user_id'])
     except Exception:
         data = {
             'total_resumes': 0,
@@ -522,7 +572,7 @@ def dashboard():
 def api_dashboard_data():
     """API endpoint returning dashboard data as JSON (for Power BI)."""
     try:
-        data = get_dashboard_data()
+        data = get_dashboard_data(session['user_id'])
         for item in data.get('all_data', []):
             if 'upload_date' in item and item['upload_date']:
                 item['upload_date'] = str(item['upload_date'])
@@ -536,7 +586,7 @@ def api_dashboard_data():
 def export_csv():
     """Export all resume data as CSV for Power BI import."""
     try:
-        data = get_dashboard_data()
+        data = get_dashboard_data(session['user_id'])
     except Exception:
         flash('No data available to export.', 'error')
         return redirect(url_for('dashboard'))
@@ -578,7 +628,7 @@ def export_csv():
 @login_required
 def api_resume(resume_id):
     """API endpoint to get resume data as JSON."""
-    resume = get_resume_by_id(resume_id)
+    resume = get_resume_by_id(resume_id, session['user_id'])
     if not resume:
         return jsonify({'error': 'Resume not found'}), 404
 
@@ -588,6 +638,54 @@ def api_resume(resume_id):
         resume['analysis']['analysed_date'] = str(resume['analysis']['analysed_date'])
 
     return jsonify(resume)
+
+
+@app.route('/uploads/<path:filename>')
+@login_required
+def uploaded_file(filename):
+    """Serve an uploaded resume file — only to the user who owns it. This
+    used to be served straight from static/, which had no auth check at
+    all (anyone who knew or guessed a filename could download someone
+    else's resume)."""
+    if not user_owns_file(filename, session['user_id']):
+        flash('File not found.', 'error')
+        return redirect(url_for('history'))
+    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+
+
+@app.route('/resume/<int:resume_id>/delete', methods=['POST'])
+@login_required
+def delete_resume_route(resume_id):
+    """Permanently delete one of the current user's resumes, including its
+    stored file and (via ON DELETE CASCADE) its skills/education/
+    experience/analysis rows."""
+    filename = delete_resume(resume_id, session['user_id'])
+    if filename:
+        try:
+            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        except OSError:
+            pass
+        flash('Resume deleted.', 'success')
+    else:
+        flash('Resume not found.', 'error')
+    return redirect(url_for('history'))
+
+
+@app.route('/account/delete', methods=['POST'])
+@login_required
+def delete_account_route():
+    """Permanently delete the current user's account and every resume they
+    uploaded, including the files on disk."""
+    user_id = session['user_id']
+    for filename in get_resume_filenames_for_user(user_id):
+        try:
+            os.remove(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+        except OSError:
+            pass
+    delete_account(user_id)
+    session.clear()
+    flash('Your account and all associated data have been permanently deleted.', 'success')
+    return redirect(url_for('login'))
 
 
 if __name__ == '__main__':

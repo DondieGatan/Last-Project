@@ -12,10 +12,15 @@ USE smart_resume_analyser;
 GO
 
 -- Table to store uploaded resumes and analysis results
+-- Note: user_id has no FK constraint here because this script may run
+-- before the users table exists (that table is created separately by
+-- setup_users_table.sql / models.init_users_table()). Ownership is
+-- enforced at the application layer instead.
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'resumes')
 BEGIN
     CREATE TABLE resumes (
         id INT IDENTITY(1,1) PRIMARY KEY,
+        user_id INT NULL,
         candidate_name NVARCHAR(255) NOT NULL,
         email NVARCHAR(255),
         phone NVARCHAR(50),
@@ -93,6 +98,7 @@ GO
 CREATE VIEW resume_dashboard AS
 SELECT
     r.id,
+    r.user_id,
     r.candidate_name,
     r.email,
     r.upload_date,

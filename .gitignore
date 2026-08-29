@@ -1,7 +1,9 @@
 __pycache__/
 *.pyc
 venv/
-static/uploads/
+uploads/
 *.log
 .vite/
 .claude/settings.local.json
+.env
+.flask_secret_key

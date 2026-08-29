@@ -62,7 +62,12 @@
                         {% endif %}
                     </td>
                     <td>{{ r.recommended_field or '—' }}</td>
-                    <td><a href="{{ url_for('result', resume_id=r.id) }}" class="btn btn-secondary btn-sm">View</a></td>
+                    <td style="display:flex;gap:0.4rem;">
+                        <a href="{{ url_for('result', resume_id=r.id) }}" class="btn btn-secondary btn-sm">View</a>
+                        <form method="POST" action="{{ url_for('delete_resume_route', resume_id=r.id) }}" onsubmit="return confirm('Permanently delete this resume and its analysis? This can\'t be undone.');">
+                            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                        </form>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

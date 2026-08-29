@@ -303,6 +303,14 @@
     </div>
 </div>
 
+{% if highlighted_text %}
+<div class="card">
+    <div class="card-header">Where These Skills Appear in Your Resume</div>
+    <p style="color:var(--gray-500);font-size:0.85rem;margin-bottom:0.75rem;">Skills detected above are highlighted below, so you can see exactly where each one was found.</p>
+    <div class="raw-text-block">{{ highlighted_text|safe }}</div>
+</div>
+{% endif %}
+
 <!-- Experience -->
 <div class="card">
     <div class="card-header">Work Experience</div>
@@ -341,6 +349,9 @@
     <button id="export-result-btn" class="btn btn-secondary" onclick="exportResultPDF()" type="button">Export as PDF</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyse Another Resume</a>
     <a href="{{ url_for('history') }}" class="btn btn-secondary">View History</a>
+    <form method="POST" action="{{ url_for('delete_resume_route', resume_id=resume.id) }}" onsubmit="return confirm('Permanently delete this resume and its analysis? This can\'t be undone.');" style="display:inline;">
+        <button type="submit" class="btn btn-danger">Delete This Resume</button>
+    </form>
 </div>
 {% endblock %}
 

@@ -1,7 +1,36 @@
 import os
+import secrets
+import warnings
+
+_APP_DIR = os.path.dirname(os.path.abspath(__file__))
+
+
+def _load_or_create_dev_secret_key():
+    """Fallback used only when SECRET_KEY isn't set in the environment.
+    Persists a random key to a gitignored local file so it survives the
+    Flask debug reloader restarting the process on every code change —
+    without this, every save would silently log everyone out."""
+    key_path = os.path.join(_APP_DIR, '.flask_secret_key')
+    if os.path.exists(key_path):
+        with open(key_path, 'r') as f:
+            return f.read().strip()
+    key = secrets.token_hex(32)
+    with open(key_path, 'w') as f:
+        f.write(key)
+    return key
+
+
+_env_secret_key = os.environ.get('SECRET_KEY')
+if not _env_secret_key:
+    warnings.warn(
+        'SECRET_KEY is not set in the environment — using a locally generated '
+        'dev key (.flask_secret_key, gitignored). Set SECRET_KEY in your .env '
+        'for a real deployment (see .env.example).',
+        RuntimeWarning
+    )
 
 class Config:
-    SECRET_KEY = os.environ.get('SECRET_KEY', 'smart-resume-analyser-secret-key-2024')
+    SECRET_KEY = _env_secret_key or _load_or_create_dev_secret_key()
 
     # Microsoft SQL Server Database Configuration
     SQL_SERVER = os.environ.get('SQL_SERVER', 'localhost')
@@ -14,7 +43,11 @@ class Config:
     SQL_PASSWORD = os.environ.get('SQL_PASSWORD', '')
 
     # Upload Configuration
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
+    # Deliberately NOT under static/ — resumes contain PII (names, emails,
+    # phone numbers) and static/ is served with no auth check. Uploaded
+    # files are served through the authenticated /uploads/<filename> route
+    # in app.py instead, which checks the requester owns the resume.
+    UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max file size
     ALLOWED_EXTENSIONS = {'pdf', 'docx', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'webp'}
 

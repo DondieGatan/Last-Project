@@ -3,6 +3,7 @@ import hashlib
 import secrets
 import random
 from datetime import datetime, timedelta
+from werkzeug.security import generate_password_hash, check_password_hash
 from config import Config
 
 
@@ -22,20 +23,76 @@ def get_db_connection():
             f"DATABASE={Config.SQL_DATABASE};"
             f"UID={Config.SQL_USERNAME};"
             f"PWD={Config.SQL_PASSWORD};"
+            f"TrustServerCertificate=yes;"
         )
     connection = pyodbc.connect(conn_str)
     return connection
 
 
-def save_resume(candidate_name, email, phone, filename, raw_text):
+def ensure_schema_migrations():
+    """Idempotent schema migrations, safe to run on every startup.
+
+    Adds resumes.user_id (the app originally had no per-user data isolation
+    — every logged-in user could see every other user's resumes via History,
+    Dashboard, and /result/<id>) and backfills existing ownerless resumes to
+    whichever registered account shares their stored email, where one
+    exists. Resumes with no matching account stay ownerless and become
+    invisible to everyone, which is the safe default for leftover test data.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('resumes') AND name = 'user_id')
+        BEGIN
+            ALTER TABLE resumes ADD user_id INT NULL;
+        END
+    """)
+    conn.commit()
+
+    cursor.execute("""
+        UPDATE r SET r.user_id = u.id
+        FROM resumes r
+        JOIN users u ON u.email = r.email
+        WHERE r.user_id IS NULL AND r.email IS NOT NULL
+    """)
+    conn.commit()
+
+    cursor.execute("IF EXISTS (SELECT * FROM sys.views WHERE name = 'resume_dashboard') DROP VIEW resume_dashboard")
+    conn.commit()
+    cursor.execute("""
+        CREATE VIEW resume_dashboard AS
+        SELECT
+            r.id,
+            r.user_id,
+            r.candidate_name,
+            r.email,
+            r.upload_date,
+            ar.overall_score,
+            ar.skills_score,
+            ar.education_score,
+            ar.experience_score,
+            ar.formatting_score,
+            ar.recommended_field,
+            (SELECT COUNT(*) FROM skills s WHERE s.resume_id = r.id) AS total_skills
+        FROM resumes r
+        LEFT JOIN analysis_results ar ON ar.resume_id = r.id
+    """)
+    conn.commit()
+
+    cursor.close()
+    conn.close()
+
+
+def save_resume(candidate_name, email, phone, filename, raw_text, user_id):
     """Save resume metadata and return the inserted ID."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "INSERT INTO resumes (candidate_name, email, phone, filename, raw_text) "
+        "INSERT INTO resumes (candidate_name, email, phone, filename, raw_text, user_id) "
         "OUTPUT INSERTED.id "
-        "VALUES (?, ?, ?, ?, ?)",
-        (candidate_name, email, phone, filename, raw_text)
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (candidate_name, email, phone, filename, raw_text, user_id)
     )
     resume_id = cursor.fetchone()[0]
     conn.commit()
@@ -120,12 +177,14 @@ def _rows_to_dicts(cursor, rows):
     return [dict(zip(columns, row)) for row in rows]
 
 
-def get_resume_by_id(resume_id):
-    """Retrieve a resume and its analysis results by ID."""
+def get_resume_by_id(resume_id, user_id):
+    """Retrieve a resume and its analysis results by ID, scoped to the
+    requesting user — returns None if the resume doesn't exist OR belongs
+    to someone else, so callers can't tell the two cases apart."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT * FROM resumes WHERE id = ?", (resume_id,))
+    cursor.execute("SELECT * FROM resumes WHERE id = ? AND user_id = ?", (resume_id, user_id))
     row = cursor.fetchone()
     if not row:
         cursor.close()
@@ -150,8 +209,8 @@ def get_resume_by_id(resume_id):
     return resume
 
 
-def get_all_resumes():
-    """Retrieve all resumes with their scores."""
+def get_all_resumes(user_id):
+    """Retrieve the requesting user's own resumes with their scores."""
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -159,24 +218,31 @@ def get_all_resumes():
                ar.overall_score, ar.recommended_field
         FROM resumes r
         LEFT JOIN analysis_results ar ON ar.resume_id = r.id
+        WHERE r.user_id = ?
         ORDER BY r.upload_date DESC
-    """)
+    """, (user_id,))
     resumes = _rows_to_dicts(cursor, cursor.fetchall())
     cursor.close()
     conn.close()
     return resumes
 
 
-def get_dashboard_data():
-    """Get aggregated data for the dashboard / Power BI export."""
+def get_dashboard_data(user_id):
+    """Get aggregated data for the dashboard / Power BI export, scoped to
+    the requesting user's own resumes only."""
     conn = get_db_connection()
     cursor = conn.cursor()
 
     # Overall statistics
-    cursor.execute("SELECT COUNT(*) AS total_resumes FROM resumes")
+    cursor.execute("SELECT COUNT(*) AS total_resumes FROM resumes WHERE user_id = ?", (user_id,))
     stats = _row_to_dict(cursor, cursor.fetchone())
 
-    cursor.execute("SELECT AVG(CAST(overall_score AS FLOAT)) AS avg_score FROM analysis_results")
+    cursor.execute("""
+        SELECT AVG(CAST(ar.overall_score AS FLOAT)) AS avg_score
+        FROM analysis_results ar
+        JOIN resumes r ON r.id = ar.resume_id
+        WHERE r.user_id = ?
+    """, (user_id,))
     avg_row = _row_to_dict(cursor, cursor.fetchone())
     stats['avg_score'] = round(avg_row['avg_score'], 1) if avg_row['avg_score'] else 0
 
@@ -184,40 +250,45 @@ def get_dashboard_data():
     cursor.execute("""
         SELECT
             CASE
-                WHEN overall_score >= 80 THEN 'Excellent'
-                WHEN overall_score >= 60 THEN 'Good'
-                WHEN overall_score >= 40 THEN 'Average'
+                WHEN ar.overall_score >= 80 THEN 'Excellent'
+                WHEN ar.overall_score >= 60 THEN 'Good'
+                WHEN ar.overall_score >= 40 THEN 'Average'
                 ELSE 'Needs Improvement'
             END AS rating,
             COUNT(*) AS count
-        FROM analysis_results
+        FROM analysis_results ar
+        JOIN resumes r ON r.id = ar.resume_id
+        WHERE r.user_id = ?
         GROUP BY
             CASE
-                WHEN overall_score >= 80 THEN 'Excellent'
-                WHEN overall_score >= 60 THEN 'Good'
-                WHEN overall_score >= 40 THEN 'Average'
+                WHEN ar.overall_score >= 80 THEN 'Excellent'
+                WHEN ar.overall_score >= 60 THEN 'Good'
+                WHEN ar.overall_score >= 40 THEN 'Average'
                 ELSE 'Needs Improvement'
             END
-    """)
+    """, (user_id,))
     stats['score_distribution'] = _rows_to_dicts(cursor, cursor.fetchall())
 
     # Top skills
     cursor.execute("""
-        SELECT TOP 20 skill_name, category, COUNT(*) AS frequency
-        FROM skills
-        GROUP BY skill_name, category
+        SELECT TOP 20 s.skill_name, s.category, COUNT(*) AS frequency
+        FROM skills s
+        JOIN resumes r ON r.id = s.resume_id
+        WHERE r.user_id = ?
+        GROUP BY s.skill_name, s.category
         ORDER BY frequency DESC
-    """)
+    """, (user_id,))
     stats['top_skills'] = _rows_to_dicts(cursor, cursor.fetchall())
 
     # Recommended fields distribution
     cursor.execute("""
-        SELECT recommended_field, COUNT(*) AS count
-        FROM analysis_results
-        WHERE recommended_field IS NOT NULL
-        GROUP BY recommended_field
+        SELECT ar.recommended_field, COUNT(*) AS count
+        FROM analysis_results ar
+        JOIN resumes r ON r.id = ar.resume_id
+        WHERE r.user_id = ? AND ar.recommended_field IS NOT NULL
+        GROUP BY ar.recommended_field
         ORDER BY count DESC
-    """)
+    """, (user_id,))
     stats['field_distribution'] = _rows_to_dicts(cursor, cursor.fetchall())
 
     # Score over time (monthly averages)
@@ -228,22 +299,24 @@ def get_dashboard_data():
             COUNT(*) AS resume_count
         FROM resumes r
         JOIN analysis_results ar ON ar.resume_id = r.id
-        WHERE r.upload_date IS NOT NULL
+        WHERE r.upload_date IS NOT NULL AND r.user_id = ?
         GROUP BY FORMAT(r.upload_date, 'yyyy-MM')
         ORDER BY month_label
-    """)
+    """, (user_id,))
     stats['score_over_time'] = _rows_to_dicts(cursor, cursor.fetchall())
 
     # ATS breakdown averages (skills, education, experience, formatting)
     cursor.execute("""
         SELECT
-            ROUND(AVG(CAST(skills_score AS FLOAT)), 1) AS avg_skills,
-            ROUND(AVG(CAST(education_score AS FLOAT)), 1) AS avg_education,
-            ROUND(AVG(CAST(experience_score AS FLOAT)), 1) AS avg_experience,
-            ROUND(AVG(CAST(formatting_score AS FLOAT)), 1) AS avg_formatting,
-            ROUND(AVG(CAST(overall_score AS FLOAT)), 1) AS avg_overall
-        FROM analysis_results
-    """)
+            ROUND(AVG(CAST(ar.skills_score AS FLOAT)), 1) AS avg_skills,
+            ROUND(AVG(CAST(ar.education_score AS FLOAT)), 1) AS avg_education,
+            ROUND(AVG(CAST(ar.experience_score AS FLOAT)), 1) AS avg_experience,
+            ROUND(AVG(CAST(ar.formatting_score AS FLOAT)), 1) AS avg_formatting,
+            ROUND(AVG(CAST(ar.overall_score AS FLOAT)), 1) AS avg_overall
+        FROM analysis_results ar
+        JOIN resumes r ON r.id = ar.resume_id
+        WHERE r.user_id = ?
+    """, (user_id,))
     ats_row = _row_to_dict(cursor, cursor.fetchone())
     stats['ats_breakdown'] = {
         'skills': ats_row.get('avg_skills') or 0,
@@ -256,11 +329,13 @@ def get_dashboard_data():
     # Quality categories
     cursor.execute("""
         SELECT
-            SUM(CASE WHEN overall_score >= 80 THEN 1 ELSE 0 END) AS high_quality,
-            SUM(CASE WHEN overall_score >= 60 AND overall_score < 80 THEN 1 ELSE 0 END) AS medium_quality,
-            SUM(CASE WHEN overall_score < 60 THEN 1 ELSE 0 END) AS low_quality
-        FROM analysis_results
-    """)
+            SUM(CASE WHEN ar.overall_score >= 80 THEN 1 ELSE 0 END) AS high_quality,
+            SUM(CASE WHEN ar.overall_score >= 60 AND ar.overall_score < 80 THEN 1 ELSE 0 END) AS medium_quality,
+            SUM(CASE WHEN ar.overall_score < 60 THEN 1 ELSE 0 END) AS low_quality
+        FROM analysis_results ar
+        JOIN resumes r ON r.id = ar.resume_id
+        WHERE r.user_id = ?
+    """, (user_id,))
     quality_row = _row_to_dict(cursor, cursor.fetchone())
     stats['quality_categories'] = {
         'high': quality_row.get('high_quality') or 0,
@@ -269,7 +344,7 @@ def get_dashboard_data():
     }
 
     # All resume data for Power BI export
-    cursor.execute("SELECT * FROM resume_dashboard")
+    cursor.execute("SELECT * FROM resume_dashboard WHERE user_id = ?", (user_id,))
     stats['all_data'] = _rows_to_dicts(cursor, cursor.fetchall())
 
     cursor.close()
@@ -282,18 +357,35 @@ def get_dashboard_data():
 # ============================================================================
 
 def _hash_password(password):
-    """Hash a password with SHA-256 and a salt."""
-    salt = secrets.token_hex(16)
-    hashed = hashlib.sha256((salt + password).encode()).hexdigest()
-    return f"{salt}${hashed}"
+    """Hash a password using Werkzeug's default algorithm (scrypt)."""
+    return generate_password_hash(password)
 
 
-def _verify_password(password, stored_hash):
-    """Verify a password against a stored hash."""
+def _is_legacy_hash(stored_hash):
+    """Accounts created before the hashing upgrade store '{salt}${sha256hex}'
+    with no ':' — Werkzeug hashes always contain one (e.g.
+    'scrypt:32768:8:1$salt$hash'), so this is a reliable discriminator."""
+    return bool(stored_hash) and ':' not in stored_hash
+
+
+def _verify_password_legacy(password, stored_hash):
+    """Verify against the old salted-SHA-256 format."""
     try:
         salt, hashed = stored_hash.split('$', 1)
         return hashlib.sha256((salt + password).encode()).hexdigest() == hashed
     except (ValueError, AttributeError):
+        return False
+
+
+def _verify_password(password, stored_hash):
+    """Verify a password against a stored hash, supporting both the current
+    Werkzeug format and the legacy salted-SHA-256 format so accounts that
+    haven't logged in since the upgrade still work."""
+    if _is_legacy_hash(stored_hash):
+        return _verify_password_legacy(password, stored_hash)
+    try:
+        return check_password_hash(stored_hash, password)
+    except (ValueError, TypeError):
         return False
 
 
@@ -358,14 +450,30 @@ def authenticate_user(email, password):
         return None
 
     user = _row_to_dict(cursor, row)
-    cursor.close()
-    conn.close()
 
     if not user.get('is_active'):
-        return None
-    if not _verify_password(password, user.get('password_hash', '')):
+        cursor.close()
+        conn.close()
         return None
 
+    stored_hash = user.get('password_hash', '')
+    if not _verify_password(password, stored_hash):
+        cursor.close()
+        conn.close()
+        return None
+
+    if _is_legacy_hash(stored_hash):
+        # Transparently upgrade this account to the current hashing
+        # algorithm now that we have the plaintext password in hand — no
+        # forced password reset needed.
+        cursor.execute(
+            "UPDATE users SET password_hash = ? WHERE id = ?",
+            (_hash_password(password), user['id'])
+        )
+        conn.commit()
+
+    cursor.close()
+    conn.close()
     return {'id': user['id'], 'full_name': user['full_name'], 'email': user['email']}
 
 
@@ -451,6 +559,68 @@ def reset_user_password(email, new_password):
         "UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expiry = NULL WHERE email = ?",
         (password_hash, email.lower().strip())
     )
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+
+# ============================================================================
+# Data Deletion (account / resume ownership cleanup)
+# ============================================================================
+
+def delete_resume(resume_id, user_id):
+    """Delete a resume owned by user_id (cascades to its skills/education/
+    experience/analysis_results at the DB level via the schema's ON DELETE
+    CASCADE foreign keys). Returns the stored filename on success, so the
+    caller can also remove the file from disk, or None if nothing matched
+    (wrong owner or already gone)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename FROM resumes WHERE id = ? AND user_id = ?", (resume_id, user_id))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return None
+    filename = row[0]
+    cursor.execute("DELETE FROM resumes WHERE id = ? AND user_id = ?", (resume_id, user_id))
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return filename
+
+
+def user_owns_file(filename, user_id):
+    """Whether the given stored filename belongs to a resume owned by
+    user_id — used to gate access before serving an uploaded file."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM resumes WHERE filename = ? AND user_id = ?", (filename, user_id))
+    owned = cursor.fetchone() is not None
+    cursor.close()
+    conn.close()
+    return owned
+
+
+def get_resume_filenames_for_user(user_id):
+    """All stored filenames for a user's resumes — used by delete_account to
+    clean up files on disk before removing the DB rows."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename FROM resumes WHERE user_id = ?", (user_id,))
+    filenames = [row[0] for row in cursor.fetchall()]
+    cursor.close()
+    conn.close()
+    return filenames
+
+
+def delete_account(user_id):
+    """Permanently delete a user account and all of their resumes (cascades
+    to skills/education/experience/analysis_results at the DB level)."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM resumes WHERE user_id = ?", (user_id,))
+    cursor.execute("DELETE FROM users WHERE id = ?", (user_id,))
     conn.commit()
     cursor.close()
     conn.close()
