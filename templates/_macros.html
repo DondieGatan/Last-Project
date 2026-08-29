@@ -1,0 +1,17 @@
+{% macro score_gauge(score, label, size=120, gauge_id='') %}
+{% set score = score or 0 %}
+{% set tier = 'excellent' if score >= 70 else ('good' if score >= 50 else ('average' if score >= 30 else 'poor')) %}
+{% set circumference = 314.16 %}
+{% set dash = (score / 100 * circumference) | round(1) %}
+<div {% if gauge_id %}id="{{ gauge_id }}"{% endif %} class="score-gauge score-gauge--{{ tier }}" style="width:{{ size }}px;height:{{ size }}px;">
+    <svg viewBox="0 0 120 120" width="{{ size }}" height="{{ size }}">
+        <circle class="score-gauge-track" cx="60" cy="60" r="50" />
+        <circle class="score-gauge-fill" cx="60" cy="60" r="50"
+                stroke-dasharray="{{ dash }} {{ circumference }}" />
+    </svg>
+    <div class="score-gauge-content">
+        <span class="score-gauge-value">{{ score }}</span>
+        <span class="score-gauge-label">{{ label }}</span>
+    </div>
+</div>
+{% endmacro %}

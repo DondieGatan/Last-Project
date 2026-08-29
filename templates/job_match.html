@@ -35,6 +35,9 @@
         <div class="match-verdict">
             <h3>{{ match_result.recommendation }}</h3>
             <p>{{ match_result.total_matched }} of {{ match_result.total_jd_keywords }} key terms matched</p>
+            {% if match_result.semantic_similarity is not none %}
+            <p class="semantic-similarity-note">Semantic similarity: {{ match_result.semantic_similarity }}% <span class="mini-tag" title="Measures overall meaning overlap between your resume and the job description, not just shared keywords">what's this?</span></p>
+            {% endif %}
         </div>
     </div>
 </div>

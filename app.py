@@ -9,7 +9,7 @@ from flask_mail import Mail, Message
 from werkzeug.utils import secure_filename
 from config import Config
 from analyzer import (analyse_resume, IMAGE_EXTENSIONS, generate_personalized_feedback,
-                      match_job_description, RESUME_TEMPLATES)
+                      match_job_description, RESUME_TEMPLATES, SKILLS_DB)
 from models import (save_resume, save_skills, save_education, save_experience,
                     save_analysis_results, get_resume_by_id, get_all_resumes,
                     get_dashboard_data, init_users_table, register_user,
@@ -18,6 +18,10 @@ from models import (save_resume, save_skills, save_education, save_experience,
 
 app = Flask(__name__)
 app.config.from_object(Config)
+
+# Display order for grouping extracted skills on the result page — mirrors
+# SKILLS_DB's own category order rather than an alphabetical/arbitrary one.
+SKILLS_CATEGORY_ORDER = list(SKILLS_DB.keys())
 
 # Initialize Flask-Mail
 mail = Mail(app)
@@ -262,7 +266,7 @@ def upload_resume():
         return redirect(url_for('index'))
 
     if not allowed_file(file.filename):
-        flash('Only PDF and image files (PNG, JPG, BMP, TIFF) are allowed.', 'error')
+        flash('Only PDF, Word (.docx), and image files (PNG, JPG, BMP, TIFF) are allowed.', 'error')
         return redirect(url_for('index'))
 
     filename = secure_filename(file.filename)
@@ -350,7 +354,21 @@ def result(resume_id):
             resume['analysis']['career_roles'] = []
             resume['analysis']['employer_summary'] = {}
 
-    return render_template('result.html', resume=resume)
+    # Group skills by category (in SKILLS_DB's category order) instead of
+    # rendering one flat list, so the result page reads by skill type.
+    skills_by_category = []
+    if resume.get('skills'):
+        by_cat = {}
+        for skill in resume['skills']:
+            by_cat.setdefault(skill['category'], []).append(skill)
+        for category in SKILLS_CATEGORY_ORDER:
+            if category in by_cat:
+                skills_by_category.append((category, by_cat.pop(category)))
+        # Any category not in the known order (shouldn't normally happen) still shows up
+        for category, skills in by_cat.items():
+            skills_by_category.append((category, skills))
+
+    return render_template('result.html', resume=resume, skills_by_category=skills_by_category)
 
 
 # --------------------------------------------------------------------------

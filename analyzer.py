@@ -742,12 +742,24 @@ def _has_tesseract():
         return False
 
 
+def extract_text_from_docx(file_path):
+    """Extract text from a .docx file using python-docx."""
+    try:
+        from docx import Document
+        doc = Document(file_path)
+        return '\n'.join(p.text for p in doc.paragraphs if p.text.strip())
+    except Exception:
+        return ""
+
+
 def extract_text(file_path):
-    """Extract text from a PDF or image file, choosing the right method."""
+    """Extract text from a PDF, Word, or image file, choosing the right method."""
     ext = os.path.splitext(file_path)[1].lower()
 
     if ext == '.pdf':
         return extract_text_from_pdf(file_path)
+    elif ext == '.docx':
+        return extract_text_from_docx(file_path)
     elif ext in IMAGE_EXTENSIONS:
         return extract_text_from_image(file_path)
     else:
@@ -2501,11 +2513,44 @@ def simulate_ats(text, skills, education, experience, scores):
 # Feature 3: Smart Job-Match Analysis
 # ---------------------------------------------------------------------------
 
-def match_job_description(resume_text, job_description):
-    """Compare a resume against a job description using semantic analysis.
+_semantic_model = None
 
-    Uses NLTK tokenization and stopword removal for deeper matching
-    beyond simple keyword overlap.
+
+def _get_semantic_model():
+    """Lazily load and cache the sentence-embedding model (only on first use,
+    so importing analyzer.py or running the rest of the app doesn't pay the
+    load cost when job-matching is never used)."""
+    global _semantic_model
+    if _semantic_model is None:
+        from sentence_transformers import SentenceTransformer
+        _semantic_model = SentenceTransformer('all-MiniLM-L6-v2')
+    return _semantic_model
+
+
+def _semantic_similarity(resume_text, job_description):
+    """Cosine similarity (0-100) between resume and JD embeddings.
+
+    Returns None if the model can't be loaded (e.g. dependency missing or a
+    first-run model download failed) so the caller can fall back gracefully
+    to lexical-only matching instead of crashing the whole feature.
+    """
+    try:
+        from sentence_transformers import util
+        model = _get_semantic_model()
+        embeddings = model.encode([resume_text[:2000], job_description[:2000]])
+        score = float(util.cos_sim(embeddings[0], embeddings[1])[0][0]) * 100
+        return max(0, min(100, round(score)))
+    except Exception:
+        return None
+
+
+def match_job_description(resume_text, job_description):
+    """Compare a resume against a job description.
+
+    Blends lexical matching (word/phrase overlap and a skills-database
+    lookup, via NLTK tokenization and stopword removal) with real semantic
+    similarity from sentence embeddings, so e.g. "JS" in a resume can match
+    "JavaScript" in a job description even without an exact string match.
     """
     if not job_description.strip():
         return {'error': 'No job description provided.'}
@@ -2568,16 +2613,25 @@ def match_job_description(resume_text, job_description):
                 else:
                     missing_skills.add(skill)
 
+    # Semantic similarity (embeddings) — supplements the lexical signals below
+    # with something that understands "JS" and "JavaScript" are related even
+    # when the resume and JD don't share the exact same string.
+    semantic_similarity = _semantic_similarity(resume_text, job_description)
+
     # Calculate match score
     if not jd_words:
         match_pct = 0
     else:
-        # Weighted: word matches (60%) + phrase matches bonus (20%) + skill matches (20%)
         word_pct = len(word_matches) / len(jd_words) * 100
         phrase_pct = min(len(phrase_matches) * 5, 100)  # Each phrase match is worth more
         skill_pct = (len(matched_skills) / max(len(required_skills), 1)) * 100
 
-        match_pct = round(word_pct * 0.5 + phrase_pct * 0.2 + skill_pct * 0.3)
+        if semantic_similarity is not None:
+            # word (35%) + phrase (15%) + skill-database (25%) + semantic (25%)
+            match_pct = round(word_pct * 0.35 + phrase_pct * 0.15 + skill_pct * 0.25 + semantic_similarity * 0.25)
+        else:
+            # Semantic model unavailable — fall back to the original lexical-only weights
+            match_pct = round(word_pct * 0.5 + phrase_pct * 0.2 + skill_pct * 0.3)
         match_pct = min(100, match_pct)
 
     # Categorize missing keywords by importance
@@ -2601,6 +2655,7 @@ def match_job_description(resume_text, job_description):
 
     return {
         'match_score': match_pct,
+        'semantic_similarity': semantic_similarity,
         'matched_keywords': sorted(word_matches)[:30],
         'matched_skills': sorted(s.title() for s in matched_skills),
         'missing_skills': sorted(s.title() for s in missing_skills),
@@ -2643,11 +2698,13 @@ def _get_skill_recommendation(skill):
 
 
 def _get_match_recommendation(score):
-    if score >= 80:
+    # Thresholds match the match-circle CSS tiers in job_match.html (70/50/30)
+    # so the visual tier and this verdict text always agree.
+    if score >= 70:
         return 'Excellent match! Your resume aligns very well with this job description.'
-    elif score >= 60:
+    elif score >= 50:
         return 'Good match. Add the missing keywords to strengthen your application.'
-    elif score >= 40:
+    elif score >= 30:
         return 'Moderate match. Consider tailoring your resume significantly for this role.'
     else:
         return 'Low match. This role may require skills or experience not reflected in your resume.'

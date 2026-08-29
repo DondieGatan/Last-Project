@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_macros.html" import score_gauge %}
 {% block title %}Analysis Result - {{ resume.candidate_name }}{% endblock %}
 
 {% block content %}
@@ -16,10 +17,7 @@
         {% if resume.phone %}<p>{{ resume.phone }}</p>{% endif %}
     </div>
     {% if analysis %}
-    <div class="overall-score">
-        <div class="score-value">{{ analysis.overall_score }}</div>
-        <div class="score-label">Overall Score</div>
-    </div>
+    {{ score_gauge(analysis.overall_score, 'Overall Score', 140, gauge_id='overall-score-gauge') }}
     {% endif %}
 </div>
 
@@ -134,10 +132,7 @@
 <div class="card">
     <div class="card-header">ATS Compatibility Scan</div>
     <div class="ats-header">
-        <div class="ats-score-circle {% if ats.ats_score >= 70 %}excellent{% elif ats.ats_score >= 50 %}good{% elif ats.ats_score >= 30 %}average{% else %}poor{% endif %}">
-            <span class="ats-score-value">{{ ats.ats_score }}</span>
-            <span class="ats-score-label">ATS Score</span>
-        </div>
+        {{ score_gauge(ats.ats_score, 'ATS Score', 100, gauge_id='ats-score-gauge') }}
         <div class="ats-verdict">
             {% if ats.pass_likely %}
             <span class="ats-pass">LIKELY TO PASS</span>
@@ -274,12 +269,17 @@
     <!-- Skills -->
     <div class="card">
         <div class="card-header">Extracted Skills ({{ resume.skills|length }})</div>
-        {% if resume.skills %}
-        <div class="skills-container">
-            {% for skill in resume.skills %}
-            <span class="skill-tag" data-category="{{ skill.category }}">{{ skill.skill_name }}</span>
-            {% endfor %}
+        {% if skills_by_category %}
+        {% for category, skills in skills_by_category %}
+        <div class="skill-category-group">
+            <div class="skill-category-label">{{ category }} ({{ skills|length }})</div>
+            <div class="skills-container">
+                {% for skill in skills %}
+                <span class="skill-tag" data-category="{{ skill.category }}">{{ skill.skill_name }}</span>
+                {% endfor %}
+            </div>
         </div>
+        {% endfor %}
         {% else %}
         <p style="color:var(--gray-400);">No skills were detected.</p>
         {% endif %}
@@ -289,7 +289,7 @@
     <div class="card">
         <div class="card-header">Education</div>
         {% if resume.education %}
-        <ul class="info-list">
+        <ul id="education-list" class="info-list">
             {% for edu in resume.education %}
             <li>
                 <div class="title">{{ edu.degree }}</div>
@@ -307,7 +307,7 @@
 <div class="card">
     <div class="card-header">Work Experience</div>
     {% if resume.experience %}
-    <ul class="info-list">
+    <ul id="experience-list" class="info-list">
         {% for exp in resume.experience %}
         <li>
             <div class="title">{{ exp.title }}</div>
@@ -338,7 +338,161 @@
 <div class="action-buttons">
     <a href="{{ url_for('personalize', resume_id=resume.id) }}" class="btn btn-primary">Get Personalized Feedback</a>
     <a href="{{ url_for('job_match', resume_id=resume.id) }}" class="btn btn-secondary">Match Against Job Description</a>
+    <button id="export-result-btn" class="btn btn-secondary" onclick="exportResultPDF()" type="button">Export as PDF</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyse Another Resume</a>
     <a href="{{ url_for('history') }}" class="btn btn-secondary">View History</a>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script>
+function exportResultPDF() {
+    var overlay = document.createElement('div');
+    overlay.id = 'pdf-overlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
+
+    var pdfContent = document.createElement('div');
+    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;padding:40px 50px;line-height:1.6;background:#ffffff;max-width:8.5in;margin:0 auto;';
+
+    function addSection(title, bodyEl) {
+        if (!bodyEl) return;
+        var sectionDiv = document.createElement('div');
+        sectionDiv.style.cssText = 'margin-bottom:18px;';
+
+        var heading = document.createElement('h3');
+        heading.textContent = title;
+        heading.style.cssText = 'font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #4361ee;padding-bottom:5px;margin-bottom:10px;margin-top:0;color:#1a1a2e;';
+
+        sectionDiv.appendChild(heading);
+        sectionDiv.appendChild(bodyEl);
+        pdfContent.appendChild(sectionDiv);
+    }
+
+    function textBlock(lines) {
+        var wrap = document.createElement('div');
+        lines.filter(Boolean).forEach(function (line) {
+            var p = document.createElement('p');
+            p.textContent = line;
+            p.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
+            wrap.appendChild(p);
+        });
+        return wrap.childElementCount ? wrap : null;
+    }
+
+    // ---- Header ----
+    var name = document.querySelector('.candidate-info h2');
+    var contactEls = document.querySelectorAll('.candidate-info p');
+    var overallScoreEl = document.querySelector('#overall-score-gauge .score-gauge-value');
+    var headerLines = [];
+    if (contactEls.length) headerLines.push(Array.prototype.map.call(contactEls, function (p) { return p.textContent.trim(); }).join('  |  '));
+    if (overallScoreEl) headerLines.push('Overall Score: ' + overallScoreEl.textContent.trim() + ' / 100');
+
+    var titleEl = document.createElement('h2');
+    titleEl.textContent = name ? name.textContent.trim() : 'Resume Analysis';
+    titleEl.style.cssText = 'font-size:22px;margin:0 0 4px 0;color:#1a1a2e;';
+    pdfContent.appendChild(titleEl);
+    var headerBlock = textBlock(headerLines);
+    if (headerBlock) { headerBlock.style.marginBottom = '18px'; pdfContent.appendChild(headerBlock); }
+
+    // ---- Score Breakdown ----
+    var scoreLines = [];
+    document.querySelectorAll('.scores-grid .score-item .label').forEach(function (label) {
+        var spans = label.querySelectorAll('span');
+        if (spans.length >= 2) scoreLines.push(spans[0].textContent.trim() + ': ' + spans[1].textContent.trim());
+    });
+    addSection('Score Breakdown', textBlock(scoreLines));
+
+    // ---- ATS Compatibility ----
+    var atsScoreEl = document.querySelector('#ats-score-gauge .score-gauge-value');
+    var atsVerdictEl = document.querySelector('.ats-pass, .ats-fail');
+    var atsLines = [];
+    if (atsScoreEl) atsLines.push('ATS Score: ' + atsScoreEl.textContent.trim() + ' / 100');
+    if (atsVerdictEl) atsLines.push(atsVerdictEl.textContent.trim());
+    addSection('ATS Compatibility', textBlock(atsLines));
+
+    // ---- Recommended Career Fields ----
+    var fieldLines = [];
+    document.querySelectorAll('.field-rec-item').forEach(function (item) {
+        var fieldName = item.querySelector('.field-rec-name');
+        var confidence = item.querySelector('.field-rec-confidence');
+        if (fieldName) fieldLines.push(fieldName.textContent.trim() + (confidence ? ' - ' + confidence.textContent.trim() : ''));
+    });
+    addSection('Recommended Career Fields', textBlock(fieldLines));
+
+    // ---- Skills (grouped) ----
+    var skillsWrap = document.createElement('div');
+    document.querySelectorAll('.skill-category-group').forEach(function (group) {
+        var label = group.querySelector('.skill-category-label');
+        var tags = group.querySelectorAll('.skill-tag');
+        if (!label || !tags.length) return;
+        var line = document.createElement('p');
+        var skillNames = Array.prototype.map.call(tags, function (t) { return t.textContent.trim(); }).join(', ');
+        line.textContent = label.textContent.trim() + ': ' + skillNames;
+        line.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
+        skillsWrap.appendChild(line);
+    });
+    addSection('Skills', skillsWrap.childElementCount ? skillsWrap : null);
+
+    // ---- Education ----
+    var eduLines = [];
+    document.querySelectorAll('#education-list > li').forEach(function (li) {
+        var title = li.querySelector('.title');
+        var subtitle = li.querySelector('.subtitle');
+        if (title) eduLines.push(title.textContent.trim() + (subtitle ? ' - ' + subtitle.textContent.trim() : ''));
+    });
+    addSection('Education', textBlock(eduLines));
+
+    // ---- Experience ----
+    var expLines = [];
+    document.querySelectorAll('#experience-list > li').forEach(function (li) {
+        var title = li.querySelector('.title');
+        var subtitle = li.querySelector('.subtitle');
+        var desc = li.querySelector('p');
+        if (title) expLines.push(title.textContent.trim() + (subtitle ? ' - ' + subtitle.textContent.trim() : ''));
+        if (desc) expLines.push(desc.textContent.trim());
+    });
+    addSection('Work Experience', textBlock(expLines));
+
+    // ---- Improvement Recommendations ----
+    var recLines = [];
+    document.querySelectorAll('.recommendation-item p').forEach(function (p) { recLines.push(p.textContent.trim()); });
+    addSection('Improvement Recommendations', textBlock(recLines));
+
+    overlay.appendChild(pdfContent);
+    document.body.appendChild(overlay);
+
+    var fileName = (name ? name.textContent.trim() : 'Resume').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_') || 'Resume';
+    if (fileName.length > 40) fileName = fileName.substring(0, 40);
+
+    var btn = document.getElementById('export-result-btn');
+    var originalHTML = btn.innerHTML;
+    btn.innerHTML = 'Generating PDF...';
+    btn.disabled = true;
+
+    var opt = {
+        margin:       [0.4, 0.5, 0.4, 0.5],
+        filename:     fileName + '_Analysis.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0, windowWidth: overlay.scrollWidth },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    setTimeout(function () {
+        html2pdf().set(opt).from(pdfContent).save().then(function () {
+            document.body.removeChild(overlay);
+            btn.innerHTML = 'Exported!';
+            setTimeout(function () { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000);
+        }).catch(function (err) {
+            console.error('PDF generation failed:', err);
+            var el = document.getElementById('pdf-overlay');
+            if (el) document.body.removeChild(el);
+            btn.innerHTML = 'Export Failed - Try Again';
+            btn.disabled = false;
+            setTimeout(function () { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
+        });
+    }, 100);
+}
+</script>
 {% endblock %}

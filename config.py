@@ -16,7 +16,7 @@ class Config:
     # Upload Configuration
     UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'static', 'uploads')
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB max file size
-    ALLOWED_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'webp'}
+    ALLOWED_EXTENSIONS = {'pdf', 'docx', 'png', 'jpg', 'jpeg', 'bmp', 'tiff', 'tif', 'webp'}
 
     # Email Configuration (for password reset)
     MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')

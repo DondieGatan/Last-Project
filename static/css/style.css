@@ -529,26 +529,53 @@ body {
     margin-top: 0.25rem;
 }
 
-.overall-score {
-    text-align: center;
-    background: linear-gradient(135deg, var(--primary), var(--secondary));
-    color: white;
-    border-radius: var(--radius);
-    padding: 1.25rem 2rem;
-    min-width: 140px;
+/* ---------- Score Gauge (SVG ring, used for Overall Score + ATS Score) ---------- */
+.score-gauge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
 }
-
-.overall-score .score-value {
-    font-size: 2.5rem;
+.score-gauge svg { transform: rotate(-90deg); }
+.score-gauge-track {
+    fill: none;
+    stroke: var(--gray-200);
+    stroke-width: 10;
+}
+.score-gauge-fill {
+    fill: none;
+    stroke-width: 10;
+    stroke-linecap: round;
+    transition: stroke-dasharray 1s ease;
+}
+.score-gauge--excellent .score-gauge-fill { stroke: var(--success); }
+.score-gauge--good .score-gauge-fill { stroke: var(--secondary); }
+.score-gauge--average .score-gauge-fill { stroke: var(--warning); }
+.score-gauge--poor .score-gauge-fill { stroke: var(--danger); }
+.score-gauge-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+.score-gauge-value {
+    font-size: 1.75rem;
     font-weight: 800;
     line-height: 1;
+    color: var(--dark);
+}
+.score-gauge-label {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--gray-500);
+    font-weight: 600;
+    margin-top: 2px;
 }
 
-.overall-score .score-label {
-    font-size: 0.85rem;
-    opacity: 0.9;
-    margin-top: 0.25rem;
-}
 
 /* ---------- Score Bars ---------- */
 .scores-grid {
@@ -591,6 +618,21 @@ body {
 .score-bar .fill.poor { background: var(--danger); }
 
 /* ---------- Skills Tags ---------- */
+.skill-category-group {
+    margin-bottom: 1rem;
+}
+.skill-category-group:last-child {
+    margin-bottom: 0;
+}
+.skill-category-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--gray-500);
+    margin-bottom: 0.5rem;
+}
+
 .skills-container {
     display: flex;
     flex-wrap: wrap;
@@ -871,37 +913,6 @@ body {
     display: flex;
     align-items: center;
     gap: 2rem;
-}
-
-.ats-score-circle {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    flex-shrink: 0;
-    border: 4px solid;
-}
-
-.ats-score-circle.excellent { border-color: var(--success); background: rgba(34,197,94,0.08); }
-.ats-score-circle.good { border-color: var(--secondary); background: rgba(14,165,233,0.08); }
-.ats-score-circle.average { border-color: var(--warning); background: rgba(245,158,11,0.08); }
-.ats-score-circle.poor { border-color: var(--danger); background: rgba(239,68,68,0.08); }
-
-.ats-score-value {
-    font-size: 1.75rem;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--dark);
-}
-
-.ats-score-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    color: var(--gray-500);
-    font-weight: 600;
 }
 
 .ats-verdict h3 { color: var(--dark); font-size: 1.1rem; }
