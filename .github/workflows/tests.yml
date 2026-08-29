@@ -52,21 +52,7 @@ jobs:
         run: pip install -r requirements-dev.txt
 
       - name: Wait for SQL Server to accept connections
-        env:
-          PYTHONWARNINGS: ignore
-        run: |
-          pip install pyodbc -q
-          for i in $(seq 1 30); do
-            python -c "
-import pyodbc, sys, os
-try:
-    pyodbc.connect('DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;UID=sa;PWD=' + os.environ['SQL_PASSWORD'] + ';TrustServerCertificate=yes;', timeout=3)
-    sys.exit(0)
-except Exception as e:
-    print(e); sys.exit(1)
-" && break
-            sleep 2
-          done
+        run: python scripts/wait_for_sql.py
 
       - name: Create schema (resumes/skills/education/experience/analysis_results)
         run: python scripts/run_sql_file.py setup_db.sql
