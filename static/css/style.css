@@ -1551,6 +1551,7 @@ table tr:hover { background: var(--gray-50); }
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
     gap: 1.5rem;
+    margin-bottom: 1.5rem;
 }
 
 .chart-card {
@@ -1562,6 +1563,12 @@ table tr:hover { background: var(--gray-50); }
     border: 1px solid rgba(255,255,255,0.6);
     padding: 1.5rem;
     min-width: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+.chart-card h3 {
+    flex-shrink: 0;
 }
 
 .dash-glass-card {
@@ -1599,7 +1606,9 @@ table tr:hover { background: var(--gray-50); }
 .bar-chart {
     display: flex;
     flex-direction: column;
+    justify-content: center;
     gap: 0.85rem;
+    flex: 1;
 }
 
 .bar-row {
@@ -1660,9 +1669,10 @@ table tr:hover { background: var(--gray-50); }
 .ring-gauge-row {
     display: flex;
     justify-content: space-around;
-    align-items: flex-start;
+    align-items: center;
     flex-wrap: wrap;
     gap: 1rem;
+    flex: 1;
     padding-top: 0.5rem;
 }
 
@@ -2374,8 +2384,22 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
 
 .app-topbar-datetime {
     font-size: 0.85rem;
-    color: var(--gray-500);
-    font-weight: 500;
+    color: var(--gray-600);
+    font-weight: 600;
+    padding: 0.4rem 1rem;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.5);
+    border: 1px solid rgba(255,255,255,0.7);
+    backdrop-filter: blur(10px) saturate(140%);
+    -webkit-backdrop-filter: blur(10px) saturate(140%);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.6), 0 2px 6px rgba(0,0,0,0.08);
+}
+
+[data-theme="dark"] .app-topbar-datetime {
+    color: #e2e8f0;
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(255,255,255,0.18);
+    box-shadow: inset 0 1px 1px rgba(255,255,255,0.15), 0 2px 6px rgba(0,0,0,0.3);
 }
 
 [data-theme="dark"] .app-topbar {
@@ -2570,18 +2594,24 @@ body.app-bg-page {
     background-attachment: fixed;
 }
 
+body.app-bg-page .app-shell {
+    background: transparent;
+}
+
 [data-theme="dark"] body.app-bg-page {
     background-image: linear-gradient(rgba(30,31,34,0.4), rgba(30,31,34,0.4)), url('../images/Background_LastProject.jpg');
 }
 
 body.app-bg-page .app-topbar {
-    background: rgba(255,255,255,0.35);
-    backdrop-filter: blur(16px) saturate(140%);
-    -webkit-backdrop-filter: blur(16px) saturate(140%);
+    background: transparent;
+    border-bottom: none;
 }
 
 [data-theme="dark"] body.app-bg-page .app-topbar {
-    background: rgba(255,255,255,0.035);
+    background: transparent;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    border-bottom: none;
 }
 
 .auth-container {
