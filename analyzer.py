@@ -2105,8 +2105,15 @@ def _cross_validate_name(extracted_name, file_path, email, text):
     return extracted_name
 
 
-def analyse_resume(file_path):
-    """Main function: analyse a resume (PDF or image) and return all extracted data."""
+def analyse_resume(file_path, original_filename=None):
+    """Main function: analyse a resume (PDF or image) and return all extracted data.
+
+    original_filename, if given, is used instead of file_path for the
+    filename-based name-guessing fallback — app.py stores uploads under a
+    randomized name (a hex token prefix, to avoid collisions between users),
+    and that random token isn't a name hint, just noise that would otherwise
+    get fed into the same heuristic.
+    """
     # Step 1: Extract text (supports PDF and images)
     text = extract_text(file_path)
 
@@ -2142,7 +2149,7 @@ def analyse_resume(file_path):
     phone = extract_phone(text)
 
     # Cross-validate name against filename and email for extra confidence
-    name = _cross_validate_name(name, file_path, email, text)
+    name = _cross_validate_name(name, original_filename or file_path, email, text)
     skills = extract_skills(text)
     education = extract_education(text)
     experience = extract_experience(text)
@@ -2930,10 +2937,32 @@ def generate_employer_summary(name, skills, education, experience, scores, field
 # Feature 4: Resume Builder Templates
 # ---------------------------------------------------------------------------
 
+# Field schemas shared by every template's Work Experience / Education
+# sections — kept as module-level constants so the three templates below
+# don't each duplicate the same five field definitions.
+_WORK_EXPERIENCE_FIELDS = [
+    {'key': 'title', 'label': 'Job Title', 'placeholder': 'e.g. Sales Associate'},
+    {'key': 'company', 'label': 'Company', 'placeholder': 'e.g. ABC Store'},
+    {'key': 'location', 'label': 'Location', 'placeholder': 'e.g. Dubai, UAE'},
+    {'key': 'dates', 'label': 'Dates', 'placeholder': 'e.g. Jan 2023 – Present'},
+    {'key': 'description', 'label': 'Description', 'type': 'textarea',
+     'placeholder': '- Describe what you did using action verbs\n- Include numbers and results where possible'},
+]
+
+_EDUCATION_FIELDS = [
+    {'key': 'degree', 'label': 'Degree / Qualification', 'placeholder': 'e.g. Bachelor of Science in Information Technology'},
+    {'key': 'institution', 'label': 'Institution', 'placeholder': 'e.g. AMA University'},
+    {'key': 'location', 'label': 'Location', 'placeholder': 'e.g. Manila, Philippines'},
+    {'key': 'dates', 'label': 'Dates', 'placeholder': 'e.g. 2020 – 2024'},
+    {'key': 'details', 'label': 'Coursework / GPA (optional)', 'type': 'textarea',
+     'placeholder': 'Relevant coursework, GPA if 3.0+, honors, etc.'},
+]
+
 RESUME_TEMPLATES = {
     'universal': {
         'title': 'Universal Resume',
         'icon': 'document',
+        'description': 'A great starting point for any resume, in any field.',
         'sections': [
             {
                 'name': 'Contact Information',
@@ -2960,25 +2989,21 @@ RESUME_TEMPLATES = {
             },
             {
                 'name': 'Work Experience',
-                'hint': 'Job Title — Company Name | City | Start Date – End Date\n'
-                        '- Describe what you did using action verbs (Managed, Developed, Designed, Coordinated, etc.)\n'
+                'type': 'repeatable',
+                'fields': _WORK_EXPERIENCE_FIELDS,
+                'hint': '- Describe what you did using action verbs (Managed, Developed, Designed, Coordinated, etc.)\n'
                         '- Include numbers and results when possible (e.g., "Served 50+ customers daily")\n'
                         '- Focus on achievements, not just duties\n\n'
-                        'Examples:\n'
-                        '• "Sales Associate — ABC Store | Dubai | Jan 2023 – Present\n'
-                        '  - Assisted 40+ customers daily and achieved 110% of monthly sales targets\n'
-                        '  - Trained 3 new team members on product knowledge and POS system"\n\n'
-                        '• "Marketing Intern — XYZ Agency | Manila | Jun 2022 – Aug 2022\n'
-                        '  - Created social media content that increased engagement by 25%"',
+                        'Example: "Sales Associate — ABC Store | Dubai | Jan 2023 – Present\n'
+                        '- Assisted 40+ customers daily and achieved 110% of monthly sales targets\n'
+                        '- Trained 3 new team members on product knowledge and POS system"',
             },
             {
                 'name': 'Education',
-                'hint': 'Degree — University / School Name | Graduation Year\n'
-                        'Relevant Coursework: [Course 1, Course 2, Course 3] (optional)\n'
-                        'GPA: [if 3.0+ or equivalent] (optional)\n\n'
-                        'Examples:\n'
-                        '• "Bachelor of Science in Information Technology — AMA University | 2024"\n'
-                        '• "High School Diploma — Dubai International School | 2020"',
+                'type': 'repeatable',
+                'fields': _EDUCATION_FIELDS,
+                'hint': 'Example: "Bachelor of Science in Information Technology — AMA University | 2024"\n'
+                        'Include relevant coursework or GPA only if it strengthens your application.',
             },
             {
                 'name': 'Projects / Achievements (Optional)',
@@ -2989,6 +3014,124 @@ RESUME_TEMPLATES = {
                         '• "Dean\'s List — 4 consecutive semesters"\n'
                         '• "1st Place, National Business Plan Competition 2023"\n'
                         '• "Volunteer of the Year — Red Cross Dubai Chapter"',
+            },
+            {
+                'name': 'References (Optional)',
+                'hint': 'Reference Name — Position, Company\nEmail: [email]\nPhone: [phone]\n\n'
+                        'Or simply write: "References available upon request"',
+            },
+        ],
+    },
+    'student': {
+        'title': 'Student / Entry-Level',
+        'icon': 'graduation',
+        'description': 'For students and new graduates with limited work experience — leads with education and projects.',
+        'sections': [
+            {
+                'name': 'Contact Information',
+                'hint': 'Full Name\nEmail Address\nPhone Number\nCity, Country\nLinkedIn / Portfolio / GitHub (optional)',
+            },
+            {
+                'name': 'Professional Summary / Objective',
+                'hint': '[Your field of study] student/graduate seeking a [target role] position.\n'
+                        'Highlight your strongest 2-3 skills or areas of study, and what you want to contribute.\n\n'
+                        'Examples:\n'
+                        '• "Final-year Computer Science student seeking an internship in software development."\n'
+                        '• "Recent Business Administration graduate with a strong interest in digital marketing."',
+            },
+            {
+                'name': 'Education',
+                'type': 'repeatable',
+                'fields': _EDUCATION_FIELDS,
+                'hint': 'Lead with this section — it\'s your strongest asset right now.\n'
+                        'Example: "Bachelor of Science in Computer Science — University of Bolton | Expected 2026"\n'
+                        'Include relevant coursework, GPA (if 3.0+), and academic honors.',
+            },
+            {
+                'name': 'Skills',
+                'hint': 'List skills gained through coursework, personal projects, or self-study.\n\n'
+                        'Technical Skills: [e.g., Python, Excel, Figma, SQL]\n'
+                        'Soft Skills: [e.g., Teamwork, Time Management, Communication]\n'
+                        'Languages: [e.g., English (Fluent), Spanish (Basic)]',
+            },
+            {
+                'name': 'Projects / Achievements',
+                'hint': 'Academic, personal, or class projects are your equivalent of work experience — include them.\n\n'
+                        'Project Name | Tools/Technologies Used\n'
+                        '- What the project does and your role in it\n'
+                        '- Any results, grades, or recognition it earned\n\n'
+                        'Also list awards, scholarships, or extracurriculars here.',
+            },
+            {
+                'name': 'Internships, Part-Time & Volunteer Work',
+                'type': 'repeatable',
+                'fields': _WORK_EXPERIENCE_FIELDS,
+                'hint': 'Any paid or unpaid experience counts — internships, part-time jobs, campus clubs, volunteering.\n'
+                        '- Focus on responsibilities and what you learned\n\n'
+                        'Example: "Marketing Intern — XYZ Agency | Manila | Jun 2025 – Aug 2025\n'
+                        '- Created social media content that increased engagement by 25%"',
+            },
+            {
+                'name': 'References (Optional)',
+                'hint': 'Reference Name — Position, Company/Institution\nEmail: [email]\nPhone: [phone]\n\n'
+                        'A professor or internship supervisor works well here.\n'
+                        'Or simply write: "References available upon request"',
+            },
+        ],
+    },
+    'professional': {
+        'title': 'Experienced Professional',
+        'icon': 'briefcase',
+        'description': 'For candidates with a solid work history — leads with career achievements and impact.',
+        'sections': [
+            {
+                'name': 'Contact Information',
+                'hint': 'Full Name\nEmail Address\nPhone Number\nCity, Country\nLinkedIn / Portfolio / Website',
+            },
+            {
+                'name': 'Professional Summary',
+                'hint': '[X years] of experience in [your field], specializing in [key strengths].\n'
+                        'Lead with your biggest career impact or area of expertise.\n\n'
+                        'Examples:\n'
+                        '• "Results-driven Project Manager with 8+ years leading cross-functional teams and delivering '
+                        'projects 15% under budget on average."\n'
+                        '• "Senior Software Engineer with 6 years building scalable web applications, specializing in '
+                        'backend architecture and team mentorship."',
+            },
+            {
+                'name': 'Work Experience',
+                'type': 'repeatable',
+                'fields': _WORK_EXPERIENCE_FIELDS,
+                'hint': 'List roles in reverse-chronological order (most recent first).\n'
+                        '- Lead each bullet with a strong action verb and quantify the outcome wherever possible\n'
+                        '- Focus on impact and results, not a list of duties\n\n'
+                        'Example: "Senior Sales Manager — ABC Corp | Dubai | Mar 2020 – Present\n'
+                        '- Grew regional revenue by 32% year-over-year by restructuring the sales pipeline\n'
+                        '- Managed and mentored a team of 6 sales representatives"',
+            },
+            {
+                'name': 'Skills',
+                'hint': 'Group your skills so a hiring manager can scan them quickly.\n\n'
+                        'Technical / Industry Skills: [e.g., Salesforce, SAP, Financial Modeling, Python]\n'
+                        'Leadership Skills: [e.g., Team Management, Strategic Planning, Stakeholder Communication]\n'
+                        'Certifications: [e.g., PMP, Six Sigma, CPA]',
+            },
+            {
+                'name': 'Education',
+                'type': 'repeatable',
+                'fields': _EDUCATION_FIELDS,
+                'hint': 'Keep this brief — your experience is the focus at this career stage.\n'
+                        'Example: "MBA — INSEAD | 2016" or "Bachelor of Commerce — University of Toronto | 2014"\n'
+                        'Coursework/GPA are usually unnecessary once you have several years of experience.',
+            },
+            {
+                'name': 'Key Achievements & Leadership',
+                'hint': 'Career highlights that don\'t fit neatly into a single role — awards, publications, speaking '
+                        'engagements, board positions, major certifications.\n\n'
+                        'Examples:\n'
+                        '• "Recipient, Company-wide Excellence Award, 2023"\n'
+                        '• "Guest speaker, Regional Marketing Summit, 2022"\n'
+                        '• "Board Member, Industry Professionals Association"',
             },
             {
                 'name': 'References (Optional)',

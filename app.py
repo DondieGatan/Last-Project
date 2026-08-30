@@ -426,7 +426,7 @@ def upload_resume():
 
     try:
         # Analyse the resume
-        result = analyse_resume(filepath)
+        result = analyse_resume(filepath, original_filename=original_filename)
 
         if 'error' in result:
             try:

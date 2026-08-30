@@ -1,10 +1,21 @@
 {% extends "base.html" %}
-{% block title %}Resume Template - Smart Resume Analyser{% endblock %}
+{% block title %}{{ template.title }} - Smart Resume Analyser{% endblock %}
 
 {% block content %}
 <div class="page-header">
-    <h2>Resume Template</h2>
+    <h2>{{ template.title }}</h2>
     <p>Follow each section below. Fill in your details using the guidance and examples provided.</p>
+</div>
+
+<!-- Progress tracker -->
+<div class="card">
+    <div class="builder-progress-header">
+        <span id="progress-text">0 of {{ template.sections|length }} sections completed</span>
+        <span class="draft-status" id="draft-status"></span>
+    </div>
+    <div class="builder-progress">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
 </div>
 
 <!-- Step-by-step sections -->
@@ -20,6 +31,13 @@
                 <strong>What to include:</strong>
                 <pre class="hint-example">{{ section.hint }}</pre>
             </div>
+
+            {% if section.type == 'repeatable' %}
+            <div class="entries-container" id="entries-{{ loop.index }}"></div>
+            <button type="button" class="btn btn-secondary add-entry-btn" onclick="addEntry({{ loop.index }})">
+                + Add Another Entry
+            </button>
+            {% else %}
             <div class="form-group">
                 <label for="section-{{ loop.index }}">Your {{ section.name }}</label>
                 <textarea id="section-{{ loop.index }}" class="builder-textarea" rows="5"
@@ -27,6 +45,7 @@
                           placeholder="Type your {{ section.name|lower }} here..."></textarea>
                 <div class="spell-status" id="spell-status-{{ loop.index }}"></div>
             </div>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
@@ -46,7 +65,15 @@
             Clean Writing
         </button>
         <button id="preview-btn" class="btn btn-secondary" onclick="generatePreview()">Update Preview</button>
+        <button id="clear-draft-btn" class="btn btn-secondary" onclick="clearDraft()">Clear Draft</button>
         <button id="copy-btn" class="btn btn-primary" onclick="copyResume()">Copy to Clipboard</button>
+        <button id="analyze-btn" class="btn btn-primary" onclick="analyzeNow()">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;">
+                <path d="M6 12.5a.5.5 0 0 1-.5.5h-4a.5.5 0 0 1-.5-.5v-9a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1h-3.5v8h3.5a.5.5 0 0 1 .5.5z"/>
+                <path d="M9.146 8.354a.5.5 0 0 1 0-.708l3-3a.5.5 0 1 1 .708.708L10.707 7.5H14.5a.5.5 0 0 1 0 1h-3.793l2.147 2.146a.5.5 0 0 1-.708.708l-3-3z"/>
+            </svg>
+            Analyse This Resume
+        </button>
         <button id="export-btn" class="btn btn-primary" onclick="exportPDF()" style="background:var(--success);">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;">
                 <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
@@ -56,27 +83,215 @@
         </button>
     </div>
 </div>
+
+<!-- Hidden form used to send the generated PDF straight into the existing /upload flow -->
+<form id="analyze-form" action="{{ url_for('upload_resume') }}" method="POST" enctype="multipart/form-data" style="display:none;">
+    <input type="file" id="analyze-file-input" name="resume">
+</form>
 {% endblock %}
 
 {% block scripts %}
 <!-- html2pdf.js library for PDF generation -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script>
+var TEMPLATE_ID = {{ template_id|tojson }};
+var SECTIONS = {{ template.sections|tojson }};
+var DRAFT_KEY = 'builderDraft_' + TEMPLATE_ID;
+
+// draftData.sections[sectionIndex] is either a string (type: 'text')
+// or an array of field-objects (type: 'repeatable').
+var draftData = { sections: {} };
+var autosaveTimer = null;
+
+// ---------- Escaping ----------
+function escapeHtml(str) {
+    var div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ---------- Repeatable-entry rendering ----------
+function makeEmptyEntry(fields) {
+    var entry = {};
+    fields.forEach(function(f) { entry[f.key] = ''; });
+    return entry;
+}
+
+function onFieldInput(e) {
+    var el = e.target;
+    var sectionIndex = el.dataset.section;
+    var entryIdx = parseInt(el.dataset.entry, 10);
+    var field = el.dataset.field;
+    draftData.sections[sectionIndex][entryIdx][field] = el.value;
+    scheduleAutosave();
+    generatePreview();
+    updateProgress();
+}
+
+function renderEntries(sectionIndex) {
+    var section = SECTIONS[sectionIndex - 1];
+    var container = document.getElementById('entries-' + sectionIndex);
+    var entries = draftData.sections[sectionIndex] || [];
+    if (entries.length === 0) {
+        entries = [makeEmptyEntry(section.fields)];
+        draftData.sections[sectionIndex] = entries;
+    }
+    container.innerHTML = '';
+    entries.forEach(function(entry, entryIdx) {
+        var card = document.createElement('div');
+        card.className = 'entry-card';
+
+        var header = document.createElement('div');
+        header.className = 'entry-header';
+        var label = document.createElement('span');
+        label.textContent = section.name + ' #' + (entryIdx + 1);
+        header.appendChild(label);
+        if (entries.length > 1) {
+            var removeBtn = document.createElement('button');
+            removeBtn.type = 'button';
+            removeBtn.className = 'remove-entry-btn';
+            removeBtn.textContent = 'Remove';
+            removeBtn.addEventListener('click', function() { removeEntry(sectionIndex, entryIdx); });
+            header.appendChild(removeBtn);
+        }
+        card.appendChild(header);
+
+        section.fields.forEach(function(field) {
+            var group = document.createElement('div');
+            group.className = 'form-group';
+            var lbl = document.createElement('label');
+            lbl.textContent = field.label;
+            group.appendChild(lbl);
+
+            var input;
+            if (field.type === 'textarea') {
+                input = document.createElement('textarea');
+                input.rows = 4;
+                input.className = 'builder-textarea';
+            } else {
+                input = document.createElement('input');
+                input.type = 'text';
+            }
+            input.placeholder = field.placeholder || '';
+            input.value = entry[field.key] || '';
+            input.dataset.section = sectionIndex;
+            input.dataset.entry = entryIdx;
+            input.dataset.field = field.key;
+            input.addEventListener('input', onFieldInput);
+            group.appendChild(input);
+            card.appendChild(group);
+        });
+
+        container.appendChild(card);
+    });
+}
+
+function addEntry(sectionIndex) {
+    var section = SECTIONS[sectionIndex - 1];
+    draftData.sections[sectionIndex].push(makeEmptyEntry(section.fields));
+    renderEntries(sectionIndex);
+    scheduleAutosave();
+    generatePreview();
+    updateProgress();
+}
+
+function removeEntry(sectionIndex, entryIdx) {
+    draftData.sections[sectionIndex].splice(entryIdx, 1);
+    renderEntries(sectionIndex);
+    scheduleAutosave();
+    generatePreview();
+    updateProgress();
+}
+
+// ---------- Unified section -> display text ----------
+function getSectionDisplayText(sectionIndex) {
+    var section = SECTIONS[sectionIndex - 1];
+    if (section.type === 'repeatable') {
+        var entries = draftData.sections[sectionIndex] || [];
+        var blocks = [];
+        entries.forEach(function(entry) {
+            var headerParts = [];
+            var bodyLines = [];
+            section.fields.forEach(function(field) {
+                var val = (entry[field.key] || '').trim();
+                if (!val) return;
+                if (field.type === 'textarea') {
+                    bodyLines.push(val);
+                } else {
+                    headerParts.push(val);
+                }
+            });
+            if (!headerParts.length && !bodyLines.length) return;
+            var block = '';
+            if (headerParts.length) {
+                block = headerParts[0];
+                if (headerParts.length > 1) {
+                    block += ' — ' + headerParts.slice(1).join(' | ');
+                }
+            }
+            if (bodyLines.length) {
+                block += (block ? '\n' : '') + bodyLines.join('\n');
+            }
+            if (block.trim()) blocks.push(block.trim());
+        });
+        return blocks.join('\n\n');
+    }
+    var ta = document.getElementById('section-' + sectionIndex);
+    return ta ? ta.value.trim() : '';
+}
+
+function hasAnyContent() {
+    for (var i = 1; i <= SECTIONS.length; i++) {
+        if (getSectionDisplayText(i)) return true;
+    }
+    return false;
+}
+
+function getResumeFileBaseName() {
+    var contactText = getSectionDisplayText(1);
+    var nameField = contactText ? contactText.split('\n')[0].trim() : 'Resume';
+    var fileName = (nameField || 'Resume').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_') || 'Resume';
+    if (fileName.length > 40) fileName = fileName.substring(0, 40);
+    return fileName;
+}
+
+// ---------- Progress tracker ----------
+function isSectionComplete(sectionIndex) {
+    var section = SECTIONS[sectionIndex - 1];
+    if (section.type === 'repeatable') {
+        var entries = draftData.sections[sectionIndex] || [];
+        return entries.some(function(entry) {
+            return Object.keys(entry).some(function(k) { return (entry[k] || '').trim(); });
+        });
+    }
+    var ta = document.getElementById('section-' + sectionIndex);
+    return !!(ta && ta.value.trim());
+}
+
+function updateProgress() {
+    var total = SECTIONS.length;
+    var completed = 0;
+    for (var i = 1; i <= total; i++) {
+        if (isSectionComplete(i)) completed++;
+    }
+    var pct = total ? Math.round((completed / total) * 100) : 0;
+    document.getElementById('progress-text').textContent = completed + ' of ' + total + ' sections completed';
+    document.getElementById('progress-fill').style.width = pct + '%';
+}
+
+// ---------- Preview / Copy ----------
 function generatePreview() {
-    var textareas = document.querySelectorAll('.builder-textarea');
-    var steps = document.querySelectorAll('.builder-step h3');
     var preview = document.getElementById('resume-preview');
     var html = '';
     var hasContent = false;
 
-    for (var i = 0; i < textareas.length; i++) {
-        var content = textareas[i].value.trim();
-        if (content) {
+    for (var i = 1; i <= SECTIONS.length; i++) {
+        var text = getSectionDisplayText(i);
+        if (text) {
             hasContent = true;
-            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
             html += '<div class="preview-section">';
-            html += '<h4>' + title + '</h4>';
-            html += '<p>' + content.replace(/\n/g, '<br>') + '</p>';
+            html += '<h4>' + escapeHtml(SECTIONS[i - 1].name) + '</h4>';
+            html += '<p>' + escapeHtml(text).replace(/\n/g, '<br>') + '</p>';
             html += '</div>';
         }
     }
@@ -88,15 +303,11 @@ function generatePreview() {
 }
 
 function copyResume() {
-    var textareas = document.querySelectorAll('.builder-textarea');
-    var steps = document.querySelectorAll('.builder-step h3');
     var text = '';
-
-    for (var i = 0; i < textareas.length; i++) {
-        var content = textareas[i].value.trim();
+    for (var i = 1; i <= SECTIONS.length; i++) {
+        var content = getSectionDisplayText(i);
         if (content) {
-            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
-            text += title.toUpperCase() + '\n';
+            text += SECTIONS[i - 1].name.toUpperCase() + '\n';
             text += content + '\n\n';
         }
     }
@@ -113,85 +324,79 @@ function copyResume() {
     });
 }
 
+// ---------- Shared PDF content builder (used by Export and Analyse) ----------
+function buildPdfContentElement() {
+    var pdfContent = document.createElement('div');
+    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;padding:40px 50px;line-height:1.6;background:#ffffff;max-width:8.5in;margin:0 auto;';
+
+    for (var i = 1; i <= SECTIONS.length; i++) {
+        var content = getSectionDisplayText(i);
+        if (!content) continue;
+
+        var sectionDiv = document.createElement('div');
+        sectionDiv.style.cssText = 'margin-bottom:18px;';
+
+        var heading = document.createElement('h3');
+        heading.textContent = SECTIONS[i - 1].name;
+        heading.style.cssText = 'font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #4361ee;padding-bottom:5px;margin-bottom:10px;margin-top:0;color:#1a1a2e;';
+
+        var para = document.createElement('div');
+        para.style.cssText = 'font-size:12px;margin:0;color:#333333;line-height:1.7;';
+
+        var lines = content.split('\n');
+        for (var j = 0; j < lines.length; j++) {
+            var lineEl = document.createElement('p');
+            lineEl.textContent = lines[j];
+            lineEl.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
+            if (lines[j].trim() === '') {
+                lineEl.style.margin = '8px 0';
+            }
+            para.appendChild(lineEl);
+        }
+
+        sectionDiv.appendChild(heading);
+        sectionDiv.appendChild(para);
+        pdfContent.appendChild(sectionDiv);
+    }
+
+    return pdfContent;
+}
+
+function pdfExportOptions(fileName) {
+    return {
+        margin:       [0.4, 0.5, 0.4, 0.5],
+        filename:     fileName + '_Resume.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0 },
+        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
+        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+}
+
 function exportPDF() {
     generatePreview();
 
-    var textareas = document.querySelectorAll('.builder-textarea');
-    var steps = document.querySelectorAll('.builder-step h3');
-    var hasContent = false;
-
-    for (var i = 0; i < textareas.length; i++) {
-        if (textareas[i].value.trim()) { hasContent = true; break; }
-    }
-
-    if (!hasContent) {
+    if (!hasAnyContent()) {
         alert('Please fill in at least one section first.');
         return;
     }
 
-    // Create a full-screen white overlay so html2canvas can render on-screen content
     var overlay = document.createElement('div');
     overlay.id = 'pdf-overlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
-
-    var pdfContent = document.createElement('div');
-    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;padding:40px 50px;line-height:1.6;background:#ffffff;max-width:8.5in;margin:0 auto;';
-
-    for (var i = 0; i < textareas.length; i++) {
-        var content = textareas[i].value.trim();
-        if (content) {
-            var title = steps[i] ? steps[i].textContent : 'Section ' + (i + 1);
-
-            var sectionDiv = document.createElement('div');
-            sectionDiv.style.cssText = 'margin-bottom:18px;';
-
-            var heading = document.createElement('h3');
-            heading.textContent = title;
-            heading.style.cssText = 'font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #4361ee;padding-bottom:5px;margin-bottom:10px;margin-top:0;color:#1a1a2e;';
-
-            var para = document.createElement('div');
-            para.style.cssText = 'font-size:12px;margin:0;color:#333333;line-height:1.7;';
-
-            var lines = content.split('\n');
-            for (var j = 0; j < lines.length; j++) {
-                var lineEl = document.createElement('p');
-                lineEl.textContent = lines[j];
-                lineEl.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
-                if (lines[j].trim() === '') {
-                    lineEl.style.margin = '8px 0';
-                }
-                para.appendChild(lineEl);
-            }
-
-            sectionDiv.appendChild(heading);
-            sectionDiv.appendChild(para);
-            pdfContent.appendChild(sectionDiv);
-        }
-    }
-
+    var pdfContent = buildPdfContentElement();
     overlay.appendChild(pdfContent);
     document.body.appendChild(overlay);
 
-    // Get the name from the first textarea for the filename
-    var nameField = textareas[0] ? textareas[0].value.trim().split('\n')[0] : 'Resume';
-    var fileName = (nameField || 'Resume').replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_') || 'Resume';
-    if (fileName.length > 40) fileName = fileName.substring(0, 40);
-
+    var fileName = getResumeFileBaseName();
     var btn = document.getElementById('export-btn');
     var originalHTML = btn.innerHTML;
     btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:-2px;margin-right:6px;"></span> Generating PDF...';
     btn.disabled = true;
 
-    var opt = {
-        margin:       [0.4, 0.5, 0.4, 0.5],
-        filename:     fileName + '_Resume.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0, windowWidth: overlay.scrollWidth },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    var opt = pdfExportOptions(fileName);
+    opt.html2canvas.windowWidth = overlay.scrollWidth;
 
-    // Small delay to let the browser paint the overlay before capturing
     setTimeout(function() {
         html2pdf().set(opt).from(pdfContent).save().then(function() {
             document.body.removeChild(overlay);
@@ -206,6 +411,116 @@ function exportPDF() {
             setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
         });
     }, 100);
+}
+
+function analyzeNow() {
+    generatePreview();
+
+    if (!hasAnyContent()) {
+        alert('Please fill in at least one section first.');
+        return;
+    }
+
+    var overlay = document.createElement('div');
+    overlay.id = 'pdf-overlay-analyze';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
+    var pdfContent = buildPdfContentElement();
+    overlay.appendChild(pdfContent);
+    document.body.appendChild(overlay);
+
+    var fileName = getResumeFileBaseName();
+    var btn = document.getElementById('analyze-btn');
+    var originalHTML = btn.innerHTML;
+    btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:-2px;margin-right:6px;"></span> Preparing...';
+    btn.disabled = true;
+
+    var opt = pdfExportOptions(fileName);
+    opt.html2canvas.windowWidth = overlay.scrollWidth;
+
+    setTimeout(function() {
+        html2pdf().set(opt).from(pdfContent).outputPdf('blob').then(function(blob) {
+            document.body.removeChild(overlay);
+            var file = new File([blob], fileName + '_Resume.pdf', { type: 'application/pdf' });
+            var dt = new DataTransfer();
+            dt.items.add(file);
+            document.getElementById('analyze-file-input').files = dt.files;
+            document.getElementById('analyze-form').submit();
+        }).catch(function(err) {
+            console.error('PDF generation for analysis failed:', err);
+            var el = document.getElementById('pdf-overlay-analyze');
+            if (el) document.body.removeChild(el);
+            btn.innerHTML = 'Failed - Try Again';
+            btn.disabled = false;
+            setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
+        });
+    }, 100);
+}
+
+// ---------- Autosave / restore / clear ----------
+function timeAgo(ts) {
+    var seconds = Math.round((Date.now() - ts) / 1000);
+    if (seconds < 10) return 'just now';
+    if (seconds < 60) return seconds + 's ago';
+    var minutes = Math.round(seconds / 60);
+    if (minutes < 60) return minutes + 'm ago';
+    var hours = Math.round(minutes / 60);
+    return hours + 'h ago';
+}
+
+function updateDraftStatus(savedAt) {
+    var el = document.getElementById('draft-status');
+    if (!el) return;
+    el.textContent = savedAt ? ('Last saved: ' + timeAgo(savedAt)) : '';
+}
+
+function saveDraft() {
+    try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify({ sections: draftData.sections, savedAt: Date.now() }));
+        updateDraftStatus(Date.now());
+    } catch (e) {
+        // localStorage unavailable (private mode, quota, etc.) — nothing to autosave against
+    }
+}
+
+function scheduleAutosave() {
+    if (autosaveTimer) clearTimeout(autosaveTimer);
+    autosaveTimer = setTimeout(saveDraft, 500);
+}
+
+function loadDraft() {
+    var raw;
+    try {
+        raw = localStorage.getItem(DRAFT_KEY);
+    } catch (e) {
+        return null;
+    }
+    if (!raw) return null;
+    try {
+        return JSON.parse(raw);
+    } catch (e) {
+        return null;
+    }
+}
+
+function clearDraft() {
+    if (!confirm('Clear everything you\'ve entered for this template? This cannot be undone.')) return;
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* nothing to clear */ }
+
+    draftData = { sections: {} };
+    SECTIONS.forEach(function(section, i) {
+        var idx = i + 1;
+        if (section.type === 'repeatable') {
+            draftData.sections[idx] = [];
+            renderEntries(idx);
+        } else {
+            draftData.sections[idx] = '';
+            var ta = document.getElementById('section-' + idx);
+            if (ta) ta.value = '';
+        }
+    });
+    updateDraftStatus(null);
+    generatePreview();
+    updateProgress();
 }
 
 // ---------- Grammar & Spell Check ----------
@@ -270,7 +585,6 @@ function cleanWriting(text) {
     Object.keys(typos).forEach(function(wrong) {
         var regex = new RegExp('\\b' + wrong + '\\b', 'gi');
         cleaned = cleaned.replace(regex, function(match) {
-            // Preserve original case pattern
             var fix = typos[wrong];
             if (match[0] === match[0].toUpperCase()) {
                 return fix.charAt(0).toUpperCase() + fix.slice(1);
@@ -290,7 +604,6 @@ function cleanWriting(text) {
 
     // Fix common grammar: "i" -> "I" standalone
     cleaned = cleaned.replace(/\bi\b(?=[^.])/g, 'I');
-    // But be careful with roman numerals and variable names - only fix standalone "i"
     cleaned = cleaned.replace(/(^|\s)i(\s|[',.])/gm, '$1I$2');
 
     // Restore preserved emails and URLs
@@ -302,34 +615,38 @@ function cleanWriting(text) {
 }
 
 function cleanAllTextareas() {
-    var textareas = document.querySelectorAll('.builder-textarea');
     var totalFixes = 0;
+    var fields = [];
 
-    textareas.forEach(function(ta, index) {
-        var original = ta.value;
+    SECTIONS.forEach(function(section, i) {
+        var idx = i + 1;
+        if (section.type === 'repeatable') {
+            var container = document.getElementById('entries-' + idx);
+            if (container) {
+                fields = fields.concat(Array.prototype.slice.call(container.querySelectorAll('input, textarea')));
+            }
+        } else {
+            var ta = document.getElementById('section-' + idx);
+            if (ta) fields.push(ta);
+        }
+    });
+
+    fields.forEach(function(el) {
+        var original = el.value;
         if (!original.trim()) return;
 
         var cleaned = cleanWriting(original);
         if (cleaned !== original) {
-            // Count approximate fixes
             var fixes = 0;
             for (var c = 0; c < Math.max(original.length, cleaned.length); c++) {
                 if (original[c] !== cleaned[c]) fixes++;
             }
             totalFixes += Math.max(1, Math.floor(fixes / 3));
-            ta.value = cleaned;
-
-            // Flash the status
-            var status = document.getElementById('spell-status-' + (index + 1));
-            if (status) {
-                status.textContent = 'Cleaned!';
-                status.className = 'spell-status spell-ok';
-                setTimeout(function() { status.textContent = ''; status.className = 'spell-status'; }, 2500);
-            }
+            el.value = cleaned;
+            el.dispatchEvent(new Event('input', { bubbles: true }));
         }
     });
 
-    // Update the preview
     generatePreview();
 
     var btn = document.getElementById('clean-btn');
@@ -346,16 +663,44 @@ function cleanAllTextareas() {
     }, 2500);
 }
 
-// Auto-preview on input
-document.querySelectorAll('.builder-textarea').forEach(function(ta) {
-    ta.addEventListener('input', generatePreview);
-});
+// ---------- Init: restore any saved draft, wire up text-section listeners ----------
+(function init() {
+    var restored = loadDraft();
 
+    SECTIONS.forEach(function(section, i) {
+        var idx = i + 1;
+        if (section.type === 'repeatable') {
+            var savedEntries = restored && restored.sections && restored.sections[idx];
+            draftData.sections[idx] = (savedEntries && savedEntries.length) ? savedEntries : [];
+            renderEntries(idx);
+        } else {
+            var savedText = (restored && restored.sections && typeof restored.sections[idx] === 'string')
+                ? restored.sections[idx] : '';
+            draftData.sections[idx] = savedText;
+            var ta = document.getElementById('section-' + idx);
+            if (ta) {
+                ta.value = savedText;
+                ta.addEventListener('input', function() {
+                    draftData.sections[idx] = ta.value;
+                    scheduleAutosave();
+                    generatePreview();
+                    updateProgress();
+                });
+            }
+        }
+    });
 
+    if (restored && restored.savedAt) {
+        updateDraftStatus(restored.savedAt);
+    }
+
+    generatePreview();
+    updateProgress();
+})();
 </script>
 <style>
 @keyframes spin { to { transform: rotate(360deg); } }
-#export-btn:disabled { opacity: 0.7; cursor: wait; }
+#export-btn:disabled, #analyze-btn:disabled { opacity: 0.7; cursor: wait; }
 .spell-status { font-size: 0.8rem; margin-top: 4px; min-height: 1.2em; transition: all 0.3s; }
 .spell-ok { color: var(--success); font-weight: 600; }
 .spell-warn { color: var(--warning); font-weight: 600; }

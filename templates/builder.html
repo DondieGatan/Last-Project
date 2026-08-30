@@ -5,14 +5,27 @@
 {% block content %}
 <div class="page-header">
     <h2>Resume Builder</h2>
-    <p>Build a professional resume step by step, using a single template designed to work across any career field — IT, business, healthcare, education, engineering, and more.</p>
+    <p>Build a professional resume step by step. Pick the template that best matches where you are in your career.</p>
 </div>
 
-<!-- Go directly to the universal builder -->
-<div style="text-align:center;margin:2rem 0;">
-    <a href="{{ url_for('builder_template', template_id='universal') }}" class="btn btn-primary" style="font-size:1.1rem;padding:0.85rem 2.5rem;">
-        Start Building Your Resume
-    </a>
+<!-- Template picker -->
+<div class="template-grid">
+    {% for template_id, template in templates.items() %}
+    <div class="template-card">
+        <div class="template-icon">
+            {% if template.icon == 'graduation' %}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.5 2.5 3 6 3s6-1.5 6-3v-5"/><path d="M22 10v6"/></svg>
+            {% elif template.icon == 'briefcase' %}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>
+            {% else %}
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M9 13h6"/><path d="M9 17h6"/></svg>
+            {% endif %}
+        </div>
+        <h3>{{ template.title }}</h3>
+        <p>{{ template.description }}</p>
+        <a href="{{ url_for('builder_template', template_id=template_id) }}" class="btn btn-primary">Use this template</a>
+    </div>
+    {% endfor %}
 </div>
 
 <!-- Tips Section -->
