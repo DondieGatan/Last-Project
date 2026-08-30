@@ -1311,6 +1311,10 @@ def extract_education(text):
         'polytechnic', 'conservatory', 'seminary',
     ]
 
+    # Splits a line into logical segments on '|' or runs of 2+ spaces (the
+    # latter shows up where a PDF's tab/column layout collapses on extraction)
+    SEGMENT_SPLIT_RE = re.compile(r'\s*\|\s*|\s{2,}')
+
     # Patterns to SKIP — these are NOT institution/degree lines
     SKIP_PATTERNS = re.compile(
         r'(^\s*[\•\-\*\–\◦\▪\uf0d8\uf0b7\®]'  # bullet points
@@ -1341,11 +1345,14 @@ def extract_education(text):
         if not any(kw in line_lower for kw in INSTITUTION_KEYWORDS):
             return False
 
-        # For pipe-separated lines, check just the institution segment
+        # For pipe- or column-separated lines, check just the institution segment.
+        # Runs of 2+ spaces show up where a PDF's tab/column layout collapses
+        # during text extraction (e.g. "BEng ... Software Engineering   University of X"),
+        # so treat those as segment breaks too, not just '|'.
         check_text = stripped
-        if '|' in stripped:
+        segments = [s for s in SEGMENT_SPLIT_RE.split(stripped) if s]
+        if len(segments) > 1:
             # Find the segment that contains the institution keyword
-            segments = [s.strip() for s in stripped.split('|')]
             for seg in segments:
                 if any(kw in seg.lower() for kw in INSTITUTION_KEYWORDS):
                     check_text = seg
@@ -1403,10 +1410,10 @@ def extract_education(text):
             continue
 
         # Clean the institution name
-        # For pipe-separated lines like "University of X | BEng Engineering | Location"
+        # For pipe- or column-separated lines like "University of X | BEng Engineering | Location"
         # extract just the institution segment
-        if '|' in stripped:
-            segments = [s.strip() for s in stripped.split('|')]
+        segments = [s for s in SEGMENT_SPLIT_RE.split(stripped) if s]
+        if len(segments) > 1:
             inst_segment = None
             for seg in segments:
                 if any(kw in seg.lower() for kw in INSTITUTION_KEYWORDS):
@@ -1498,14 +1505,14 @@ def extract_education(text):
                 degree = clean_degree
                 break
 
-        # Also check if the degree is embedded in the original line (pipe-separated)
-        # e.g., "University of Manchester | BEng (Hons) Software Engineering | Location"
+        # Also check if the degree is embedded in the original line (pipe- or
+        # column-separated), e.g. "University of Manchester | BEng (Hons) Software
+        # Engineering | Location" or "BEng (Hons) Software Engineering   University of X"
         if not degree:
             original_line = lines[inst_idx].strip()
-            if '|' in original_line:
-                segments = [s.strip() for s in original_line.split('|')]
+            segments = [s for s in SEGMENT_SPLIT_RE.split(original_line) if s]
+            if len(segments) > 1:
                 for seg in segments:
-                    seg_lower = seg.lower()
                     # Skip the institution segment itself and location segments
                     if seg.lower() == institution.lower():
                         continue
