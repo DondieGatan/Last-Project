@@ -25,6 +25,10 @@ jobs:
           --health-retries=10
 
     env:
+      # scripts/*.py do `from config import Config`; running them as
+      # `python scripts/foo.py` puts scripts/ on sys.path, not the repo
+      # root, so without this the import fails with ModuleNotFoundError.
+      PYTHONPATH: ${{ github.workspace }}
       SQL_SERVER: localhost
       SQL_DATABASE: smart_resume_analyser
       # Matches config.py's own default driver — installed below to match.
