@@ -67,11 +67,11 @@ class Config:
     RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
     RESEND_FROM = os.environ.get('RESEND_FROM', 'onboarding@resend.dev')
 
-    # AI Assistant (Resume Builder chat) — OpenAI's Chat Completions API.
-    # Without a key set, the chat panel in the builder just shows a friendly
-    # "not configured" message instead of erroring.
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-    OPENAI_MODEL = os.environ.get('OPENAI_MODEL', 'gpt-4o-mini')
+    # AI Assistant (Resume Builder chat) — Google Gemini API (free tier, no
+    # billing required). Without a key set, the chat panel in the builder
+    # just shows a friendly "not configured" message instead of erroring.
+    GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+    GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.5-flash')
 
     # Password reset token expiry (seconds)
     RESET_TOKEN_EXPIRY = 3600  # 1 hour
