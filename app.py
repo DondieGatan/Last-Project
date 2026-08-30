@@ -47,14 +47,19 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 try:
     init_users_table()
 except Exception:
-    pass  # Table may already exist or DB not yet available
+    # Table may already exist, or the DB isn't reachable yet at import time
+    # (e.g. multiple gunicorn workers racing on startup). Logged rather than
+    # silently swallowed — a previous silent failure here meant a schema
+    # migration never applied on the first Render boot, and the only sign
+    # was /register crashing with "Invalid column name" once real traffic hit.
+    app.logger.exception('init_users_table() failed at startup')
 
 # Idempotent schema migrations (adds resumes.user_id for per-user data
 # isolation, backfills existing rows, recreates the dashboard view)
 try:
     ensure_schema_migrations()
 except Exception:
-    pass  # DB not yet available at import time
+    app.logger.exception('ensure_schema_migrations() failed at startup')
 
 
 def allowed_file(filename):
@@ -129,7 +134,11 @@ def login():
             session['user_email'] = user['email']
             flash(f'Welcome back, {user["full_name"]}!', 'success')
             next_page = request.args.get('next') or request.form.get('next')
-            if next_page and next_page.startswith('/'):
+            # Must be a same-site path, not a protocol-relative URL like
+            # "//evil.com" (browsers resolve that to an external host even
+            # though it "starts with /") or a backslash variant some
+            # browsers treat the same way.
+            if next_page and next_page.startswith('/') and not next_page.startswith(('//', '/\\')):
                 return redirect(next_page)
             return redirect(url_for('index'))
         else:
@@ -224,6 +233,7 @@ def logout():
 
 
 @app.route('/forgot-password', methods=['GET', 'POST'])
+@limiter.limit('5 per hour', methods=['POST'])
 def forgot_password():
     """Forgot password page — sends a 6-digit code to email."""
     if 'user_id' in session:
@@ -257,6 +267,7 @@ def forgot_password():
 
 
 @app.route('/verify-code', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def verify_code():
     """Verify the 6-digit reset code."""
     if 'user_id' in session:
@@ -322,6 +333,7 @@ def reset_password():
 
 
 @app.route('/verify-email', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def verify_email():
     """Verify the 6-digit email-verification code, then log the user in —
     they already proved their password at registration, so a second login
@@ -417,6 +429,10 @@ def upload_resume():
         result = analyse_resume(filepath)
 
         if 'error' in result:
+            try:
+                os.remove(filepath)
+            except OSError:
+                pass
             flash(result['error'], 'error')
             return redirect(url_for('index'))
 
@@ -454,6 +470,13 @@ def upload_resume():
         return redirect(url_for('result', resume_id=resume_id))
 
     except Exception as e:
+        # Nothing references this file on disk if analysis failed before
+        # save_resume() ran (no DB row was created), so it would otherwise
+        # sit in the uploads folder forever with no way to clean it up.
+        try:
+            os.remove(filepath)
+        except OSError:
+            pass
         flash(f'An error occurred during analysis: {str(e)}', 'error')
         return redirect(url_for('index'))
 

@@ -69,3 +69,14 @@ class Config:
 
     # Password reset token expiry (seconds)
     RESET_TOKEN_EXPIRY = 3600  # 1 hour
+
+    # Session cookie hardening. SAMESITE=Lax blocks the session cookie from
+    # being sent on cross-site POST requests (e.g. a malicious page
+    # auto-submitting a form to /account/delete while the victim is logged
+    # in elsewhere) — classic CSRF via cookie riding, since this app has no
+    # separate CSRF token. SECURE is tied to Render's own env var (Render
+    # sets RENDER=true on every service) rather than hardcoded True, so it
+    # doesn't break local dev, which runs over plain http://localhost.
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = bool(os.environ.get('RENDER'))

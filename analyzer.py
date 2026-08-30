@@ -1652,16 +1652,16 @@ def calculate_scores(text, skills, education, experience):
         if any(kw in text_lower for kw in ['ph.d', 'phd', 'doctorate']):
             scores['education'] = 100
             edu_reasons.append("Doctorate/PhD detected — highest academic qualification.")
-        elif any(kw in text_lower for kw in ['master', 'm.sc', 'msc', 'm.tech', 'mba', 'mca']):
+        elif any(kw in text_lower for kw in ['master', 'm.sc', 'msc', 'm.tech', 'mtech', 'm.eng', 'meng', 'm.com', 'mba', 'mca']):
             scores['education'] = 85
             edu_reasons.append("Master's degree detected — strong academic background.")
             edu_suggestions.append("Adding relevant certifications or publications can push this to a perfect score.")
-        elif any(kw in text_lower for kw in ['bachelor', 'b.sc', 'bsc', 'b.tech', 'b.e.', 'bca']):
+        elif any(kw in text_lower for kw in ['bachelor', 'b.sc', 'bsc', 'b.tech', 'btech', 'b.e.', 'b.eng', 'beng', 'b.com', 'bca']):
             scores['education'] = 70
             edu_reasons.append("Bachelor's degree detected.")
             edu_suggestions.append("Consider pursuing certifications or a master's degree to strengthen this section.")
             edu_suggestions.append("Include relevant coursework, GPA (if strong), or academic projects.")
-        elif any(kw in text_lower for kw in ['diploma', 'associate']):
+        elif any(kw in text_lower for kw in ['diploma', 'associate', 'btec', 'hnd', 'hnc']):
             scores['education'] = 50
             edu_reasons.append("Diploma or associate degree detected.")
             edu_suggestions.append("Highlight any additional certifications, bootcamps, or online courses you've completed.")
