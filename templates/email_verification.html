@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+</head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+    <div style="max-width:500px;margin:40px auto;background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <div style="background:linear-gradient(135deg,#4361ee,#7c3aed);padding:32px 24px;text-align:center;">
+            <h1 style="color:#ffffff;margin:0;font-size:22px;">Smart Resume Analyser</h1>
+        </div>
+        <div style="padding:32px 24px;">
+            <h2 style="color:#1a1a2e;margin-top:0;">Verify Your Email</h2>
+            <p style="color:#555;line-height:1.6;">
+                Thanks for signing up! Use the following 6-digit code to verify <strong>{{ user_email }}</strong> and activate your account:
+            </p>
+            <div style="text-align:center;margin:28px 0;">
+                <div style="display:inline-block;background:#f0f0ff;border:2px dashed #4361ee;border-radius:12px;padding:20px 40px;letter-spacing:12px;font-size:36px;font-weight:800;color:#4361ee;font-family:'Courier New',monospace;">
+                    {{ verification_code }}
+                </div>
+            </div>
+            <p style="color:#888;font-size:13px;line-height:1.6;">
+                This code will expire in <strong>10 minutes</strong>. If you didn't create an account, you can safely ignore this email.
+            </p>
+            <hr style="border:none;border-top:1px solid #eee;margin:24px 0;">
+            <p style="color:#aaa;font-size:12px;text-align:center;">
+                Smart Resume Analyser &copy; 2026 &mdash; Dondie Godwin Gatan
+            </p>
+        </div>
+    </div>
+</body>
+</html>

@@ -7,6 +7,8 @@ from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, Response, send_from_directory, session)
 from flask_mail import Mail, Message
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.utils import secure_filename
 from config import Config
 from analyzer import (analyse_resume, IMAGE_EXTENSIONS, generate_personalized_feedback,
@@ -16,6 +18,7 @@ from models import (save_resume, save_skills, save_education, save_experience,
                     get_dashboard_data, init_users_table, register_user,
                     authenticate_user, get_user_by_id, get_user_by_email,
                     create_reset_code, verify_reset_code, reset_user_password,
+                    create_email_verification_code, verify_email_code,
                     ensure_schema_migrations, delete_resume, delete_account,
                     get_resume_filenames_for_user, user_owns_file)
 
@@ -28,6 +31,13 @@ SKILLS_CATEGORY_ORDER = list(SKILLS_DB.keys())
 
 # Initialize Flask-Mail
 mail = Mail(app)
+
+# Rate limiting — keyed by IP, in-memory (fine for this app's single-process
+# scale; see README's "Scaling this further" if that ever changes). Only
+# applied to the auth endpoints that are actually worth throttling
+# (credential guessing on /login, mass account creation on /register);
+# everything else uses the default (no limit).
+limiter = Limiter(get_remote_address, app=app, default_limits=[])
 
 # Ensure upload folder exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -94,6 +104,7 @@ def login_required(f):
 # --------------------------------------------------------------------------
 
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit('10 per minute', methods=['POST'])
 def login():
     """Login page."""
     if 'user_id' in session:
@@ -108,6 +119,9 @@ def login():
             return render_template('login.html')
 
         user = authenticate_user(email, password)
+        if user and not user.get('email_verified'):
+            flash('Please verify your email before logging in.', 'error')
+            return redirect(url_for('verify_email', email=user['email']))
         if user:
             session['user_id'] = user['id']
             session['user_name'] = user['full_name']
@@ -124,7 +138,30 @@ def login():
     return render_template('login.html')
 
 
+def _send_verification_email(email):
+    """Generate and email a fresh 6-digit verification code. Falls back to
+    flashing the code directly if the mail service is unavailable, mirroring
+    the password-reset flow's dev/demo fallback."""
+    code = create_email_verification_code(email)
+    if not code:
+        return False
+    try:
+        msg = Message(
+            subject='Verify Your Email - Smart Resume Analyser',
+            recipients=[email],
+            html=render_template('email_verification.html',
+                                 verification_code=code,
+                                 user_email=email)
+        )
+        mail.send(msg)
+        flash('A 6-digit verification code has been sent to your email.', 'success')
+    except Exception:
+        flash(f'Email service unavailable. Your verification code is: {code}', 'success')
+    return True
+
+
 @app.route('/register', methods=['GET', 'POST'])
+@limiter.limit('5 per hour', methods=['POST'])
 def register():
     """Registration page."""
     if 'user_id' in session:
@@ -156,8 +193,8 @@ def register():
 
         success, message = register_user(full_name, email, password)
         if success:
-            flash('Account created! Please log in.', 'success')
-            return redirect(url_for('login'))
+            _send_verification_email(email)
+            return redirect(url_for('verify_email', email=email))
         else:
             flash(message, 'error')
             return render_template('register.html', full_name=full_name, email=email)
@@ -273,6 +310,55 @@ def reset_password():
             return redirect(url_for('forgot_password'))
 
     return render_template('reset_password.html')
+
+
+@app.route('/verify-email', methods=['GET', 'POST'])
+def verify_email():
+    """Verify the 6-digit email-verification code, then log the user in —
+    they already proved their password at registration, so a second login
+    step here would just be friction."""
+    if 'user_id' in session:
+        return redirect(url_for('index'))
+
+    email = request.args.get('email', '') or request.form.get('email', '')
+
+    if not email:
+        flash('Please register or log in first.', 'error')
+        return redirect(url_for('register'))
+
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+
+        if not code or len(code) != 6:
+            flash('Please enter the 6-digit code.', 'error')
+            return render_template('verify_email.html', email=email)
+
+        if verify_email_code(email, code):
+            user = get_user_by_email(email)
+            if user:
+                session['user_id'] = user['id']
+                session['user_name'] = user['full_name']
+                session['user_email'] = user['email']
+            flash('Email verified! Welcome.', 'success')
+            return redirect(url_for('index'))
+        else:
+            flash('Invalid or expired code. Please try again.', 'error')
+            return render_template('verify_email.html', email=email)
+
+    return render_template('verify_email.html', email=email)
+
+
+@app.route('/resend-verification', methods=['GET', 'POST'])
+@limiter.limit('5 per hour')
+def resend_verification():
+    """Resend a fresh verification code to an unverified account."""
+    email = request.args.get('email', '') or request.form.get('email', '')
+    if not email:
+        flash('Please register or log in first.', 'error')
+        return redirect(url_for('register'))
+
+    _send_verification_email(email)
+    return redirect(url_for('verify_email', email=email))
 
 
 # --------------------------------------------------------------------------

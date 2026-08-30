@@ -58,6 +58,33 @@ def ensure_schema_migrations():
     """)
     conn.commit()
 
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'email_verified')
+        BEGIN
+            ALTER TABLE users ADD email_verified BIT NOT NULL DEFAULT 0;
+            -- Grandfather in every account that existed before this feature
+            -- shipped — they never went through a verification step, so it
+            -- would be wrong to suddenly lock them out at their next login.
+            -- Runs only in the same batch the column is added, never again.
+            UPDATE users SET email_verified = 1;
+        END
+    """)
+    conn.commit()
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'verification_code')
+        BEGIN
+            ALTER TABLE users ADD verification_code NVARCHAR(10) NULL;
+        END
+    """)
+    conn.commit()
+    cursor.execute("""
+        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'verification_code_expiry')
+        BEGIN
+            ALTER TABLE users ADD verification_code_expiry DATETIME NULL;
+        END
+    """)
+    conn.commit()
+
     cursor.execute("IF EXISTS (SELECT * FROM sys.views WHERE name = 'resume_dashboard') DROP VIEW resume_dashboard")
     conn.commit()
     cursor.execute("""
@@ -440,7 +467,7 @@ def authenticate_user(email, password):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, full_name, email, password_hash, is_active FROM users WHERE email = ?",
+        "SELECT id, full_name, email, password_hash, is_active, email_verified FROM users WHERE email = ?",
         (email.lower().strip(),)
     )
     row = cursor.fetchone()
@@ -474,7 +501,12 @@ def authenticate_user(email, password):
 
     cursor.close()
     conn.close()
-    return {'id': user['id'], 'full_name': user['full_name'], 'email': user['email']}
+    return {
+        'id': user['id'],
+        'full_name': user['full_name'],
+        'email': user['email'],
+        'email_verified': bool(user.get('email_verified')),
+    }
 
 
 def get_user_by_id(user_id):
@@ -547,6 +579,63 @@ def verify_reset_code(email, code):
     if (user['reset_token'] and user['reset_token'] == code.strip()
             and user['reset_token_expiry'] and user['reset_token_expiry'] >= datetime.now()):
         return True
+    return False
+
+
+def create_email_verification_code(email):
+    """Generate a 6-digit email-verification code. Returns code or None."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM users WHERE email = ?", (email.lower().strip(),))
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return None
+
+    code = str(random.randint(100000, 999999))
+    expiry = datetime.now() + timedelta(minutes=10)
+    cursor.execute(
+        "UPDATE users SET verification_code = ?, verification_code_expiry = ? WHERE email = ?",
+        (code, expiry, email.lower().strip())
+    )
+    conn.commit()
+    cursor.close()
+    conn.close()
+    return code
+
+
+def verify_email_code(email, code):
+    """Verify a 6-digit email-verification code and mark the account
+    verified if it matches. Returns True if valid."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT verification_code, verification_code_expiry FROM users WHERE email = ?",
+        (email.lower().strip(),)
+    )
+    row = cursor.fetchone()
+    if not row:
+        cursor.close()
+        conn.close()
+        return False
+
+    user = _row_to_dict(cursor, row)
+
+    if (user['verification_code'] and user['verification_code'] == code.strip()
+            and user['verification_code_expiry'] and user['verification_code_expiry'] >= datetime.now()):
+        cursor.execute(
+            "UPDATE users SET email_verified = 1, verification_code = NULL, verification_code_expiry = NULL "
+            "WHERE email = ?",
+            (email.lower().strip(),)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    cursor.close()
+    conn.close()
     return False
 
 
