@@ -220,7 +220,7 @@
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-3px;margin-right:6px;"><path d="M5.5 2A3.5 3.5 0 0 0 2 5.5v5A3.5 3.5 0 0 0 5.5 14h5a3.5 3.5 0 0 0 3.5-3.5V8a.5.5 0 0 1 1 0v2.5a4.5 4.5 0 0 1-4.5 4.5h-5A4.5 4.5 0 0 1 1 10.5v-5A4.5 4.5 0 0 1 5.5 1H8a.5.5 0 0 1 0 1H5.5z"/><path d="M16 3a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"/></svg>
         Power BI Integration
     </h3>
-    <p>Export your resume analytics data for advanced visualisation in Power BI Desktop.</p>
+    <p>Export your resume analytics for advanced visualisation in Power BI Desktop.</p>
     <div style="display:flex;justify-content:center;gap:0.75rem;flex-wrap:wrap;margin-top:0.75rem;">
         <a href="{{ url_for('export_csv') }}" class="btn btn-success">Export as CSV</a>
         <a href="{{ url_for('api_dashboard_data') }}" class="btn btn-secondary" target="_blank">View JSON API</a>
@@ -228,13 +228,13 @@
 </div>
 
 <div class="card dash-glass-card" style="margin-top:1.5rem;">
-    <div class="card-header">How to Connect Power BI</div>
+    <div class="card-header">Connecting to Power BI</div>
     <ol style="padding-left:1.25rem;color:var(--gray-600);line-height:2;">
-        <li>Click <strong>"Export as CSV"</strong> above to download the resume analytics data.</li>
+        <li>Click <strong>"Export as CSV"</strong> above to download your resume analytics.</li>
         <li>Open <strong>Power BI Desktop</strong> and go to <em>Home &rarr; Get Data &rarr; Text/CSV</em>.</li>
         <li>Select the downloaded <code>resume_analytics.csv</code> file and click <em>Load</em>.</li>
-        <li>Use the fields (Overall Score, Skills Score, Recommended Field, etc.) to create charts and visuals.</li>
-        <li><strong>For live data:</strong> Use <em>Get Data &rarr; Web</em> and enter the JSON API URL: <code>http://localhost:5000/api/dashboard-data</code></li>
+        <li>Use the available fields (Overall Score, Skills Score, Recommended Field, etc.) to build charts and visuals.</li>
+        <li><strong>For live data:</strong> use <em>Get Data &rarr; Web</em> and enter the URL from the <strong>"View JSON API"</strong> button above.</li>
     </ol>
 </div>
 {% endblock %}
