@@ -635,21 +635,21 @@ def job_match(resume_id):
 @app.route('/builder')
 @login_required
 def builder():
-    """Beginner-friendly resume builder with templates and guidance."""
-    return render_template('builder.html', templates=RESUME_TEMPLATES)
+    """Guided, step-by-step resume builder — one flexible template that
+    covers students working while studying, online-education graduates, and
+    experienced professionals alike, so there's no template picker to choose
+    between."""
+    return render_template('builder_template.html',
+                           template=RESUME_TEMPLATES['universal'],
+                           template_id='universal')
 
 
 @app.route('/builder/<template_id>')
 @login_required
 def builder_template(template_id):
-    """Show a specific resume builder template."""
-    template = RESUME_TEMPLATES.get(template_id)
-    if not template:
-        flash('Template not found.', 'error')
-        return redirect(url_for('builder'))
-    return render_template('builder_template.html',
-                           template=template,
-                           template_id=template_id)
+    """Old per-template URLs (from before the builder was consolidated to a
+    single template) still resolve here instead of 404ing."""
+    return redirect(url_for('builder'))
 
 
 # --------------------------------------------------------------------------
