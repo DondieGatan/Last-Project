@@ -716,4 +716,4 @@ def delete_account(user_id):
     conn.commit()
     cursor.close()
     conn.close()
-    return True, 'Password has been reset successfully.'
+    return True, 'Account deleted successfully.'
