@@ -652,6 +652,69 @@ def builder_template(template_id):
     return redirect(url_for('builder'))
 
 
+def _resume_chat_reply(message, history, resume_context):
+    """Call OpenAI's Chat Completions API for the Resume Builder's AI
+    assistant. Raises on failure — the caller decides how to report it."""
+    system_prompt = (
+        'You are a friendly, encouraging resume-writing assistant embedded in a '
+        'resume builder tool. Help the user strengthen their resume: sharpen '
+        'wording, suggest strong action verbs, quantify achievements, fix clarity '
+        'issues, and keep advice ATS-friendly (simple formatting, no tables or '
+        'graphics). When you rewrite something, show the improved text clearly so '
+        "the user can copy it straight into the relevant field. Keep replies "
+        "concise and grounded in the user's actual resume content below — don't "
+        "ask them to repeat information that's already there.\n\n"
+        'Current resume draft:\n' + (resume_context or '(nothing written yet)')
+    )
+    messages = [{'role': 'system', 'content': system_prompt}]
+    for turn in history[-10:]:
+        if not isinstance(turn, dict):
+            continue
+        role = turn.get('role')
+        content = (turn.get('content') or '').strip()[:2000]
+        if role in ('user', 'assistant') and content:
+            messages.append({'role': role, 'content': content})
+    messages.append({'role': 'user', 'content': message})
+
+    resp = requests.post(
+        'https://api.openai.com/v1/chat/completions',
+        headers={'Authorization': f'Bearer {Config.OPENAI_API_KEY}'},
+        json={'model': Config.OPENAI_MODEL, 'messages': messages, 'max_tokens': 600, 'temperature': 0.7},
+        timeout=30,
+    )
+    resp.raise_for_status()
+    return resp.json()['choices'][0]['message']['content'].strip()
+
+
+@app.route('/api/resume-chat', methods=['POST'])
+@login_required
+@limiter.limit('20 per hour')
+def api_resume_chat():
+    """AI assistant chat for the Resume Builder. Sends the user's message plus
+    their current draft as context to an LLM and returns a reply. Costs real
+    money per call, hence the rate limit."""
+    if not Config.OPENAI_API_KEY:
+        return jsonify({'error': 'The AI assistant is not configured on this server yet.'}), 503
+
+    data = request.get_json(silent=True) or {}
+    message = (data.get('message') or '').strip()[:2000]
+    if not message:
+        return jsonify({'error': 'Please enter a message.'}), 400
+
+    history = data.get('history') if isinstance(data.get('history'), list) else []
+    resume_context = (data.get('resume_context') or '').strip()[:6000]
+
+    try:
+        reply = _resume_chat_reply(message, history, resume_context)
+        return jsonify({'reply': reply})
+    except requests.exceptions.RequestException:
+        app.logger.exception('Resume chat: OpenAI request failed')
+        return jsonify({'error': 'The AI assistant is temporarily unavailable. Please try again shortly.'}), 502
+    except Exception:
+        app.logger.exception('Resume chat: unexpected error')
+        return jsonify({'error': 'Something went wrong. Please try again.'}), 500
+
+
 # --------------------------------------------------------------------------
 # Existing routes
 # --------------------------------------------------------------------------
