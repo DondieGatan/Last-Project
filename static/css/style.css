@@ -572,6 +572,20 @@ h1, h2, h3, .card-header, .dash-header h2 {
     -webkit-backdrop-filter: blur(16px);
 }
 
+/* In the logged-in shell, sit directly under the topbar's date/time badge
+   (right-aligned to match the topbar's own padding) instead of centering
+   across the whole content width. */
+.app-content > .flash {
+    width: fit-content;
+    margin: 0.75rem 2rem 0 auto;
+}
+
+@media (max-width: 768px) {
+    .app-content > .flash {
+        margin: 0.75rem 1.25rem 0 auto;
+    }
+}
+
 .flash.error {
     background: rgba(239,68,68,0.12);
     color: #fca5a5;
@@ -3006,6 +3020,10 @@ body.app-bg-page .app-topbar {
 
 .auth-link:hover {
     text-decoration: underline;
+}
+
+.auth-link-white {
+    color: #fff;
 }
 
 .auth-btn {

@@ -410,22 +410,29 @@ function renderDashboard(filterField) {
     });
 
     // --- 7. Actionable Insights Bar List ---
-    var improvements = [
-        { label: 'Add Relevant Skills', pts: Math.round((100 - st.avgSkills) * 0.35) },
-        { label: 'Improve Experience Details', pts: Math.round((100 - st.avgExp) * 0.30) },
-        { label: 'Add Education Info', pts: Math.round((100 - st.avgEdu) * 0.20) },
-        { label: 'Fix Formatting', pts: Math.round((100 - st.avgFmt) * 0.15) }
-    ];
-    improvements.sort(function(a, b) { return b.pts - a.pts; });
     var actionContainer = document.getElementById('actionBars');
     if (actionContainer) {
-        var maxPts = Math.max.apply(null, improvements.map(function(i){ return i.pts; }));
-        actionContainer.innerHTML = improvements.map(function(i) {
-            var pct = maxPts > 0 ? (i.pts / maxPts) * 100 : 0;
-            return '<div class="bar-row"><div class="bar-label">' + i.label + '</div>' +
-                '<div class="bar-track"><div class="dash-bar-fill" style="width:' + pct + '%;"></div></div>' +
-                '<div class="bar-value">+' + i.pts + '</div></div>';
-        }).join('');
+        if (st.total === 0) {
+            // With no resumes, every average defaults to 0 and the formula
+            // below would produce the same generic-looking numbers for
+            // every empty account — show an honest empty state instead.
+            actionContainer.innerHTML = '<div class="insight-item"><span class="insight-icon info">i</span><p>Upload a resume to see personalised suggestions here.</p></div>';
+        } else {
+            var improvements = [
+                { label: 'Add Relevant Skills', pts: Math.round((100 - st.avgSkills) * 0.35) },
+                { label: 'Improve Experience Details', pts: Math.round((100 - st.avgExp) * 0.30) },
+                { label: 'Add Education Info', pts: Math.round((100 - st.avgEdu) * 0.20) },
+                { label: 'Fix Formatting', pts: Math.round((100 - st.avgFmt) * 0.15) }
+            ];
+            improvements.sort(function(a, b) { return b.pts - a.pts; });
+            var maxPts = Math.max.apply(null, improvements.map(function(i){ return i.pts; }));
+            actionContainer.innerHTML = improvements.map(function(i) {
+                var pct = maxPts > 0 ? (i.pts / maxPts) * 100 : 0;
+                return '<div class="bar-row"><div class="bar-label">' + i.label + '</div>' +
+                    '<div class="bar-track"><div class="dash-bar-fill" style="width:' + pct + '%;"></div></div>' +
+                    '<div class="bar-value">+' + i.pts + '</div></div>';
+            }).join('');
+        }
     }
 
     // --- 8. AI Insights ---

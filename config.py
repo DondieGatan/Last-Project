@@ -1,8 +1,10 @@
 import os
 import secrets
 import warnings
+from dotenv import load_dotenv
 
 _APP_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_APP_DIR, '.env'))
 
 
 def _load_or_create_dev_secret_key():

@@ -139,9 +139,7 @@ def login():
 
 
 def _send_verification_email(email):
-    """Generate and email a fresh 6-digit verification code. Falls back to
-    flashing the code directly if the mail service is unavailable, mirroring
-    the password-reset flow's dev/demo fallback."""
+    """Generate and email a fresh 6-digit verification code."""
     code = create_email_verification_code(email)
     if not code:
         return False
@@ -156,7 +154,8 @@ def _send_verification_email(email):
         mail.send(msg)
         flash('A 6-digit verification code has been sent to your email.', 'success')
     except Exception:
-        flash(f'Email service unavailable. Your verification code is: {code}', 'success')
+        app.logger.exception('Failed to send verification email to %s', email)
+        flash('We could not send the verification email right now. Please try Resend Code in a moment.', 'error')
     return True
 
 
@@ -224,7 +223,6 @@ def forgot_password():
 
         code = create_reset_code(email)
         if code:
-            # Send code via email
             try:
                 msg = Message(
                     subject='Your Reset Code - Smart Resume Analyser',
@@ -236,8 +234,8 @@ def forgot_password():
                 mail.send(msg)
                 flash('A 6-digit code has been sent to your email.', 'success')
             except Exception:
-                # If email fails, show the code directly (dev/demo fallback)
-                flash(f'Email service unavailable. Your reset code is: {code}', 'success')
+                app.logger.exception('Failed to send password-reset email to %s', email)
+                flash('We could not send the reset email right now. Please try Resend Code in a moment.', 'error')
             return redirect(url_for('verify_code', email=email))
         else:
             # Don't reveal whether the email exists
