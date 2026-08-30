@@ -1,0 +1,12 @@
+.env
+.flask_secret_key
+venv/
+uploads/
+.git/
+.github/
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
+scripts/
+tests/
