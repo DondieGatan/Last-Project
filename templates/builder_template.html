@@ -325,37 +325,148 @@ function copyResume() {
 }
 
 // ---------- Shared PDF content builder (used by Export and Analyse) ----------
+// Styled after a clean, single-column, ATS-friendly resume layout: a bold
+// name header with a contact line underneath, navy section headers with an
+// underline, bold title / italic company-and-dates entry headers, and real
+// bullet lists instead of literal "-" characters as plain text.
+var PDF_ACCENT = '#1a5276';
+var PDF_TEXT = '#1a1a1a';
+var PDF_META = '#555555';
+
+function pdfFlushBullets(container, lines) {
+    if (!lines.length) return;
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'margin:2px 0 8px 0;';
+    lines.forEach(function(text) {
+        // A native <li> marker — and even a literal "•" character — reliably
+        // gets misread by Tesseract once this page is captured to an image
+        // and OCR'd back into text by the analyser (it confuses the round
+        // bullet glyph for characters like "«"). A plain hyphen has proven
+        // reliable through that same OCR round trip. text-indent/margin-left
+        // gives the usual hanging indent.
+        var item = document.createElement('div');
+        item.textContent = '-  ' + text;
+        item.style.cssText = 'font-size:11.5px;color:' + PDF_TEXT + ';margin:2px 0 2px 14px;text-indent:-14px;';
+        wrap.appendChild(item);
+    });
+    container.appendChild(wrap);
+}
+
 function buildPdfContentElement() {
     var pdfContent = document.createElement('div');
-    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:#1a1a2e;padding:40px 50px;line-height:1.6;background:#ffffff;max-width:8.5in;margin:0 auto;';
+    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:' + PDF_TEXT + ';padding:32px 46px;line-height:1.45;background:#ffffff;max-width:8.5in;margin:0 auto;';
 
-    for (var i = 1; i <= SECTIONS.length; i++) {
-        var content = getSectionDisplayText(i);
-        if (!content) continue;
+    // ---- Header: first section is assumed to be Contact Information —
+    // its first line becomes the name, the rest becomes one contact line ----
+    var startIndex = 1;
+    var contactTa = document.getElementById('section-1');
+    if (SECTIONS[0] && SECTIONS[0].type !== 'repeatable' && contactTa && contactTa.value.trim()) {
+        var contactLines = contactTa.value.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
+        var nameEl = document.createElement('div');
+        nameEl.textContent = contactLines[0];
+        nameEl.style.cssText = 'font-size:26px;font-weight:bold;color:' + PDF_TEXT + ';margin-bottom:4px;';
+        pdfContent.appendChild(nameEl);
+
+        var rest = contactLines.slice(1);
+        if (rest.length) {
+            var contactLine = document.createElement('div');
+            contactLine.textContent = rest.join('   |   ');
+            contactLine.style.cssText = 'font-size:11px;color:' + PDF_META + ';padding-bottom:10px;margin-bottom:14px;border-bottom:1.5px solid ' + PDF_ACCENT + ';';
+            pdfContent.appendChild(contactLine);
+        }
+        startIndex = 2;
+    }
+
+    for (var i = startIndex; i <= SECTIONS.length; i++) {
+        var section = SECTIONS[i - 1];
+        if (!getSectionDisplayText(i)) continue;
 
         var sectionDiv = document.createElement('div');
-        sectionDiv.style.cssText = 'margin-bottom:18px;';
+        sectionDiv.style.cssText = 'margin-bottom:16px;';
 
         var heading = document.createElement('h3');
-        heading.textContent = SECTIONS[i - 1].name;
-        heading.style.cssText = 'font-size:15px;font-weight:bold;text-transform:uppercase;letter-spacing:1.5px;border-bottom:2px solid #4361ee;padding-bottom:5px;margin-bottom:10px;margin-top:0;color:#1a1a2e;';
+        // "(Optional)" is builder-UI guidance, not resume content — strip it.
+        heading.textContent = section.name.replace(/\s*\(Optional\)\s*$/i, '');
+        heading.style.cssText = 'font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1.5px solid ' + PDF_ACCENT + ';padding-bottom:4px;margin-bottom:8px;margin-top:0;color:' + PDF_ACCENT + ';';
+        sectionDiv.appendChild(heading);
 
-        var para = document.createElement('div');
-        para.style.cssText = 'font-size:12px;margin:0;color:#333333;line-height:1.7;';
+        if (section.type === 'repeatable') {
+            var entries = draftData.sections[i] || [];
+            entries.forEach(function(entry) {
+                var headerParts = [];
+                var descLines = [];
+                section.fields.forEach(function(field) {
+                    var val = (entry[field.key] || '').trim();
+                    if (!val) return;
+                    if (field.type === 'textarea') {
+                        descLines = descLines.concat(val.split('\n').map(function(l) { return l.replace(/^[-•]\s*/, '').trim(); }).filter(Boolean));
+                    } else {
+                        headerParts.push(val);
+                    }
+                });
+                if (!headerParts.length && !descLines.length) return;
 
-        var lines = content.split('\n');
-        for (var j = 0; j < lines.length; j++) {
-            var lineEl = document.createElement('p');
-            lineEl.textContent = lines[j];
-            lineEl.style.cssText = 'margin:2px 0;font-size:12px;color:#333333;';
-            if (lines[j].trim() === '') {
-                lineEl.style.margin = '8px 0';
-            }
-            para.appendChild(lineEl);
+                if (headerParts.length) {
+                    var entryHeader = document.createElement('div');
+                    entryHeader.style.cssText = 'margin-bottom:3px;';
+                    var titleSpan = document.createElement('span');
+                    titleSpan.textContent = headerParts[0];
+                    titleSpan.style.cssText = 'font-size:12px;font-weight:bold;color:' + PDF_TEXT + ';';
+                    entryHeader.appendChild(titleSpan);
+                    if (headerParts.length > 1) {
+                        var metaSpan = document.createElement('span');
+                        // "  —  " (not bare whitespace): analyse's education
+                        // parser splits on '|' or a run of 2+ spaces to tell
+                        // a degree from its institution — a plain 3-space gap
+                        // between the two spans didn't reliably survive OCR
+                        // as a wide-enough gap, so the em dash + spaces makes
+                        // the separation unambiguous both visually and to OCR.
+                        metaSpan.textContent = '  —  ' + headerParts.slice(1).join(' | ');
+                        metaSpan.style.cssText = 'font-size:11px;font-style:italic;color:' + PDF_META + ';';
+                        entryHeader.appendChild(metaSpan);
+                    }
+                    sectionDiv.appendChild(entryHeader);
+                }
+
+                pdfFlushBullets(sectionDiv, descLines);
+            });
+        } else {
+            var rawLines = (document.getElementById('section-' + i) || { value: '' }).value.split('\n');
+            var bulletBuffer = [];
+
+            rawLines.forEach(function(line) {
+                var trimmed = line.trim();
+                if (!trimmed) {
+                    pdfFlushBullets(sectionDiv, bulletBuffer);
+                    bulletBuffer = [];
+                    return;
+                }
+
+                var bulletMatch = trimmed.match(/^[-•]\s*(.+)/);
+                if (bulletMatch) {
+                    bulletBuffer.push(bulletMatch[1]);
+                    return;
+                }
+                pdfFlushBullets(sectionDiv, bulletBuffer);
+                bulletBuffer = [];
+
+                var p = document.createElement('p');
+                p.style.cssText = 'font-size:11.5px;margin:3px 0;color:' + PDF_TEXT + ';line-height:1.5;';
+                // Bold a leading "Label:" (used by Skills, e.g. "Technical Skills: Python, SQL").
+                var labelMatch = trimmed.match(/^([A-Za-z][A-Za-z0-9 &/]{1,40}):\s*(.+)/);
+                if (labelMatch) {
+                    var b = document.createElement('b');
+                    b.textContent = labelMatch[1] + ': ';
+                    p.appendChild(b);
+                    p.appendChild(document.createTextNode(labelMatch[2]));
+                } else {
+                    p.textContent = trimmed;
+                }
+                sectionDiv.appendChild(p);
+            });
+            pdfFlushBullets(sectionDiv, bulletBuffer);
         }
 
-        sectionDiv.appendChild(heading);
-        sectionDiv.appendChild(para);
         pdfContent.appendChild(sectionDiv);
     }
 

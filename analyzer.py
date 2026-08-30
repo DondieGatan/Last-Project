@@ -1311,9 +1311,12 @@ def extract_education(text):
         'polytechnic', 'conservatory', 'seminary',
     ]
 
-    # Splits a line into logical segments on '|' or runs of 2+ spaces (the
-    # latter shows up where a PDF's tab/column layout collapses on extraction)
-    SEGMENT_SPLIT_RE = re.compile(r'\s*\|\s*|\s{2,}')
+    # Splits a line into logical segments on '|', a run of 2+ spaces (shows
+    # up where a PDF's tab/column layout collapses on extraction), or a
+    # dash-style separator like "Degree — Institution" (an em/en dash with
+    # single spaces around it survives OCR's word-gap detection even when a
+    # wider run of literal space characters gets normalized down to one).
+    SEGMENT_SPLIT_RE = re.compile(r'\s*\|\s*|\s{2,}|\s+[–—]\s+')
 
     # Patterns to SKIP — these are NOT institution/degree lines
     SKIP_PATTERNS = re.compile(
