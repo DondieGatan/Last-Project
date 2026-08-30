@@ -61,5 +61,11 @@ class Config:
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', '')
 
+    # Resend (HTTP-based transactional email) — used instead of SMTP when
+    # set, since some hosts (e.g. Render's free tier) block outbound SMTP
+    # ports entirely but always allow outbound HTTPS.
+    RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+    RESEND_FROM = os.environ.get('RESEND_FROM', 'onboarding@resend.dev')
+
     # Password reset token expiry (seconds)
     RESET_TOKEN_EXPIRY = 3600  # 1 hour

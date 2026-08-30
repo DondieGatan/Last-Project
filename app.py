@@ -3,6 +3,7 @@ import csv
 import io
 import json
 import secrets
+import requests
 from functools import wraps
 from flask import (Flask, render_template, request, redirect, url_for,
                    flash, jsonify, Response, send_from_directory, session)
@@ -138,20 +139,33 @@ def login():
     return render_template('login.html')
 
 
+def _send_email(to, subject, html):
+    """Send an email via Resend's HTTP API if configured (production, where
+    outbound SMTP is commonly blocked), otherwise via Flask-Mail/SMTP
+    (local dev). Raises on failure — callers decide how to report it."""
+    if Config.RESEND_API_KEY:
+        resp = requests.post(
+            'https://api.resend.com/emails',
+            headers={'Authorization': f'Bearer {Config.RESEND_API_KEY}'},
+            json={'from': Config.RESEND_FROM, 'to': [to], 'subject': subject, 'html': html},
+            timeout=10,
+        )
+        resp.raise_for_status()
+    else:
+        mail.send(Message(subject=subject, recipients=[to], html=html))
+
+
 def _send_verification_email(email):
     """Generate and email a fresh 6-digit verification code."""
     code = create_email_verification_code(email)
     if not code:
         return False
     try:
-        msg = Message(
-            subject='Verify Your Email - Smart Resume Analyser',
-            recipients=[email],
-            html=render_template('email_verification.html',
-                                 verification_code=code,
-                                 user_email=email)
+        _send_email(
+            email,
+            'Verify Your Email - Smart Resume Analyser',
+            render_template('email_verification.html', verification_code=code, user_email=email)
         )
-        mail.send(msg)
         flash('A 6-digit verification code has been sent to your email.', 'success')
     except Exception:
         app.logger.exception('Failed to send verification email to %s', email)
@@ -224,14 +238,11 @@ def forgot_password():
         code = create_reset_code(email)
         if code:
             try:
-                msg = Message(
-                    subject='Your Reset Code - Smart Resume Analyser',
-                    recipients=[email],
-                    html=render_template('email_reset.html',
-                                         reset_code=code,
-                                         user_email=email)
+                _send_email(
+                    email,
+                    'Your Reset Code - Smart Resume Analyser',
+                    render_template('email_reset.html', reset_code=code, user_email=email)
                 )
-                mail.send(msg)
                 flash('A 6-digit code has been sent to your email.', 'success')
             except Exception:
                 app.logger.exception('Failed to send password-reset email to %s', email)
