@@ -58,18 +58,21 @@ def ensure_schema_migrations():
     """)
     conn.commit()
 
-    cursor.execute("""
-        IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'email_verified')
-        BEGIN
-            ALTER TABLE users ADD email_verified BIT NOT NULL DEFAULT 0;
-            -- Grandfather in every account that existed before this feature
-            -- shipped — they never went through a verification step, so it
-            -- would be wrong to suddenly lock them out at their next login.
-            -- Runs only in the same batch the column is added, never again.
-            UPDATE users SET email_verified = 1;
-        END
-    """)
-    conn.commit()
+    cursor.execute("SELECT 1 FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'email_verified'")
+    email_verified_is_new = cursor.fetchone() is None
+    if email_verified_is_new:
+        # ALTER TABLE and a statement referencing the new column can't share
+        # a batch — SQL Server resolves column names before the ALTER takes
+        # effect, so this has to be its own execute() call, committed,
+        # before the backfill UPDATE below runs.
+        cursor.execute("ALTER TABLE users ADD email_verified BIT NOT NULL DEFAULT 0")
+        conn.commit()
+        # Grandfather in every account that existed before this feature
+        # shipped — they never went through a verification step, so it
+        # would be wrong to suddenly lock them out at their next login.
+        # Runs only once, right after the column is added, never again.
+        cursor.execute("UPDATE users SET email_verified = 1")
+        conn.commit()
     cursor.execute("""
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'verification_code')
         BEGIN
