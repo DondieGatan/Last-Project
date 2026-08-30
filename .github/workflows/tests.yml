@@ -41,7 +41,9 @@ jobs:
           curl https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
           curl https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
           sudo apt-get update
-          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc-dev
+          sudo ACCEPT_EULA=Y apt-get install -y msodbcsql17 unixodbc unixodbc-dev
+          odbcinst -j
+          odbcinst -q -d
 
       - name: Set up Python
         uses: actions/setup-python@v5
