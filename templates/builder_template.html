@@ -91,8 +91,12 @@
 {% endblock %}
 
 {% block scripts %}
-<!-- html2pdf.js library for PDF generation -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- jsPDF for PDF generation — used directly (not through html2canvas rasterization)
+     so the export is a genuine text-layer PDF: selectable/copyable text, much
+     smaller file size, and actually parseable by real employer ATS systems,
+     most of which don't run OCR on an uploaded resume the way this app's own
+     analyser does as a fallback for scanned files. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"></script>
 <script>
 var TEMPLATE_ID = {{ template_id|tojson }};
 var SECTIONS = {{ template.sections|tojson }};
@@ -324,56 +328,96 @@ function copyResume() {
     });
 }
 
-// ---------- Shared PDF content builder (used by Export and Analyse) ----------
-// Styled after a clean, single-column, ATS-friendly resume layout: a bold
-// name header with a contact line underneath, navy section headers with an
-// underline, bold title / italic company-and-dates entry headers, and real
-// bullet lists instead of literal "-" characters as plain text.
-var PDF_ACCENT = '#1a5276';
-var PDF_TEXT = '#1a1a1a';
-var PDF_META = '#555555';
+// ---------- Native-text PDF builder (used by Export and Analyse) ----------
+// Draws real, embedded PDF text via jsPDF directly, rather than rasterizing
+// an HTML element through html2canvas the way the previous version did.
+// That image-based approach meant the file had no actual text layer at all
+// — this app's own analyser could still read it via an OCR fallback, but a
+// real employer's ATS almost certainly can't, since most don't run OCR on
+// uploaded resumes. Colors and layout are matched to a clean, single-column
+// reference resume: a navy name/section-header accent, black body text, and
+// gray italic meta text. Helvetica (jsPDF's built-in, closest to Arial) is
+// one of the most broadly ATS-recommended fonts.
+var PDF_ACCENT = [31, 56, 99];   // #1F3863 navy — name, section headers, dividers
+var PDF_TEXT = [0, 0, 0];        // pure black — body text
+var PDF_META = [84, 84, 84];     // #545454 gray — italic company/institution/dates
 
-function pdfFlushBullets(container, lines) {
-    if (!lines.length) return;
-    var wrap = document.createElement('div');
-    wrap.style.cssText = 'margin:2px 0 8px 0;';
-    lines.forEach(function(text) {
-        // A native <li> marker — and even a literal "•" character — reliably
-        // gets misread by Tesseract once this page is captured to an image
-        // and OCR'd back into text by the analyser (it confuses the round
-        // bullet glyph for characters like "«"). A plain hyphen has proven
-        // reliable through that same OCR round trip. text-indent/margin-left
-        // gives the usual hanging indent.
-        var item = document.createElement('div');
-        item.textContent = '-  ' + text;
-        item.style.cssText = 'font-size:11.5px;color:' + PDF_TEXT + ';margin:2px 0 2px 14px;text-indent:-14px;';
-        wrap.appendChild(item);
-    });
-    container.appendChild(wrap);
-}
+var PDF_MARGIN_L = 46, PDF_MARGIN_R = 46, PDF_MARGIN_TOP = 44, PDF_MARGIN_BOTTOM = 44;
 
-function buildPdfContentElement() {
-    var pdfContent = document.createElement('div');
-    pdfContent.style.cssText = 'font-family:Arial,Helvetica,sans-serif;color:' + PDF_TEXT + ';padding:32px 46px;line-height:1.45;background:#ffffff;max-width:8.5in;margin:0 auto;';
+function buildResumePdfDoc() {
+    var doc = new window.jspdf.jsPDF({ unit: 'pt', format: 'letter' });
+    var pageW = doc.internal.pageSize.getWidth();
+    var pageH = doc.internal.pageSize.getHeight();
+    var contentW = pageW - PDF_MARGIN_L - PDF_MARGIN_R;
+    var y = PDF_MARGIN_TOP;
 
-    // ---- Header: first section is assumed to be Contact Information —
-    // its first line becomes the name, the rest becomes one contact line ----
+    function ensureSpace(h) {
+        if (y + h > pageH - PDF_MARGIN_BOTTOM) {
+            doc.addPage();
+            y = PDF_MARGIN_TOP;
+        }
+    }
+
+    function setColor(rgb) { doc.setTextColor(rgb[0], rgb[1], rgb[2]); }
+
+    // Draws already-wrapped lines one at a time (rather than in one text()
+    // call) so a page break can land mid-paragraph. Justifies every line
+    // except the last, matching normal typographic convention — a short
+    // final line shouldn't get stretched to fill the column.
+    function drawWrapped(lines, x, width, lineHeight, justify) {
+        lines.forEach(function(line, i) {
+            ensureSpace(lineHeight);
+            if (justify && i < lines.length - 1) {
+                doc.text(line, x, y, { align: 'justify', maxWidth: width });
+            } else {
+                doc.text(line, x, y);
+            }
+            y += lineHeight;
+        });
+    }
+
+    function drawDivider() {
+        doc.setDrawColor(PDF_ACCENT[0], PDF_ACCENT[1], PDF_ACCENT[2]);
+        doc.setLineWidth(1);
+        doc.line(PDF_MARGIN_L, y, pageW - PDF_MARGIN_R, y);
+        y += 10;
+    }
+
+    function drawBullets(lines) {
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(10.5);
+        setColor(PDF_TEXT);
+        lines.forEach(function(text) {
+            var wrapped = doc.splitTextToSize('•  ' + text, contentW - 12);
+            drawWrapped(wrapped, PDF_MARGIN_L + 12, contentW - 12, 14, true);
+        });
+        if (lines.length) y += 4;
+    }
+
+    // ---- Header: first section is Contact Information — its first line
+    // becomes the name, the rest becomes one contact line ----
     var startIndex = 1;
     var contactTa = document.getElementById('section-1');
     if (SECTIONS[0] && SECTIONS[0].type !== 'repeatable' && contactTa && contactTa.value.trim()) {
         var contactLines = contactTa.value.split('\n').map(function(l) { return l.trim(); }).filter(Boolean);
-        var nameEl = document.createElement('div');
-        nameEl.textContent = contactLines[0];
-        nameEl.style.cssText = 'font-size:26px;font-weight:bold;color:' + PDF_TEXT + ';margin-bottom:4px;';
-        pdfContent.appendChild(nameEl);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(22);
+        setColor(PDF_ACCENT);
+        doc.text(contactLines[0], PDF_MARGIN_L, y);
+        y += 24;
 
         var rest = contactLines.slice(1);
         if (rest.length) {
-            var contactLine = document.createElement('div');
-            contactLine.textContent = rest.join('   |   ');
-            contactLine.style.cssText = 'font-size:11px;color:' + PDF_META + ';padding-bottom:10px;margin-bottom:14px;border-bottom:1.5px solid ' + PDF_ACCENT + ';';
-            pdfContent.appendChild(contactLine);
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(10);
+            setColor(PDF_TEXT);
+            var contactWrapped = doc.splitTextToSize(rest.join('   |   '), contentW);
+            drawWrapped(contactWrapped, PDF_MARGIN_L, contentW, 13, false);
+            y += 4;
         }
+        drawDivider();
+        y += 4;
         startIndex = 2;
     }
 
@@ -381,14 +425,15 @@ function buildPdfContentElement() {
         var section = SECTIONS[i - 1];
         if (!getSectionDisplayText(i)) continue;
 
-        var sectionDiv = document.createElement('div');
-        sectionDiv.style.cssText = 'margin-bottom:16px;';
-
-        var heading = document.createElement('h3');
+        ensureSpace(30);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(12);
+        setColor(PDF_ACCENT);
         // "(Optional)" is builder-UI guidance, not resume content — strip it.
-        heading.textContent = section.name.replace(/\s*\(Optional\)\s*$/i, '');
-        heading.style.cssText = 'font-size:13px;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1.5px solid ' + PDF_ACCENT + ';padding-bottom:4px;margin-bottom:8px;margin-top:0;color:' + PDF_ACCENT + ';';
-        sectionDiv.appendChild(heading);
+        doc.text(section.name.replace(/\s*\(Optional\)\s*$/i, '').toUpperCase(), PDF_MARGIN_L, y);
+        y += 6;
+        drawDivider();
+        y += 6;
 
         if (section.type === 'repeatable') {
             var entries = draftData.sections[i] || [];
@@ -407,28 +452,23 @@ function buildPdfContentElement() {
                 if (!headerParts.length && !descLines.length) return;
 
                 if (headerParts.length) {
-                    var entryHeader = document.createElement('div');
-                    entryHeader.style.cssText = 'margin-bottom:3px;';
-                    var titleSpan = document.createElement('span');
-                    titleSpan.textContent = headerParts[0];
-                    titleSpan.style.cssText = 'font-size:12px;font-weight:bold;color:' + PDF_TEXT + ';';
-                    entryHeader.appendChild(titleSpan);
+                    ensureSpace(15);
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(11);
+                    setColor(PDF_TEXT);
+                    doc.text(headerParts[0], PDF_MARGIN_L, y);
+                    var titleW = doc.getTextWidth(headerParts[0]);
+
                     if (headerParts.length > 1) {
-                        var metaSpan = document.createElement('span');
-                        // "  —  " (not bare whitespace): analyse's education
-                        // parser splits on '|' or a run of 2+ spaces to tell
-                        // a degree from its institution — a plain 3-space gap
-                        // between the two spans didn't reliably survive OCR
-                        // as a wide-enough gap, so the em dash + spaces makes
-                        // the separation unambiguous both visually and to OCR.
-                        metaSpan.textContent = '  —  ' + headerParts.slice(1).join(' | ');
-                        metaSpan.style.cssText = 'font-size:11px;font-style:italic;color:' + PDF_META + ';';
-                        entryHeader.appendChild(metaSpan);
+                        doc.setFont('helvetica', 'italic');
+                        doc.setFontSize(10);
+                        setColor(PDF_META);
+                        doc.text('   —   ' + headerParts.slice(1).join('  |  '), PDF_MARGIN_L + titleW, y);
                     }
-                    sectionDiv.appendChild(entryHeader);
+                    y += 15;
                 }
 
-                pdfFlushBullets(sectionDiv, descLines);
+                drawBullets(descLines);
             });
         } else {
             var rawLines = (document.getElementById('section-' + i) || { value: '' }).value.split('\n');
@@ -437,7 +477,7 @@ function buildPdfContentElement() {
             rawLines.forEach(function(line) {
                 var trimmed = line.trim();
                 if (!trimmed) {
-                    pdfFlushBullets(sectionDiv, bulletBuffer);
+                    drawBullets(bulletBuffer);
                     bulletBuffer = [];
                     return;
                 }
@@ -447,41 +487,41 @@ function buildPdfContentElement() {
                     bulletBuffer.push(bulletMatch[1]);
                     return;
                 }
-                pdfFlushBullets(sectionDiv, bulletBuffer);
+                drawBullets(bulletBuffer);
                 bulletBuffer = [];
 
-                var p = document.createElement('p');
-                p.style.cssText = 'font-size:11.5px;margin:3px 0;color:' + PDF_TEXT + ';line-height:1.5;';
                 // Bold a leading "Label:" (used by Skills, e.g. "Technical Skills: Python, SQL").
                 var labelMatch = trimmed.match(/^([A-Za-z][A-Za-z0-9 &/]{1,40}):\s*(.+)/);
+                ensureSpace(14);
                 if (labelMatch) {
-                    var b = document.createElement('b');
-                    b.textContent = labelMatch[1] + ': ';
-                    p.appendChild(b);
-                    p.appendChild(document.createTextNode(labelMatch[2]));
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10.5);
+                    setColor(PDF_TEXT);
+                    var label = labelMatch[1] + ': ';
+                    doc.text(label, PDF_MARGIN_L, y);
+                    var labelW = doc.getTextWidth(label);
+                    doc.setFont('helvetica', 'normal');
+                    var valueWrapped = doc.splitTextToSize(labelMatch[2], contentW - labelW);
+                    doc.text(valueWrapped[0] || '', PDF_MARGIN_L + labelW, y);
+                    y += 14;
+                    if (valueWrapped.length > 1) {
+                        drawWrapped(valueWrapped.slice(1), PDF_MARGIN_L, contentW, 14, false);
+                    }
                 } else {
-                    p.textContent = trimmed;
+                    doc.setFont('helvetica', 'normal');
+                    doc.setFontSize(10.5);
+                    setColor(PDF_TEXT);
+                    var wrapped = doc.splitTextToSize(trimmed, contentW);
+                    drawWrapped(wrapped, PDF_MARGIN_L, contentW, 14, true);
                 }
-                sectionDiv.appendChild(p);
             });
-            pdfFlushBullets(sectionDiv, bulletBuffer);
+            drawBullets(bulletBuffer);
         }
 
-        pdfContent.appendChild(sectionDiv);
+        y += 10;
     }
 
-    return pdfContent;
-}
-
-function pdfExportOptions(fileName) {
-    return {
-        margin:       [0.4, 0.5, 0.4, 0.5],
-        filename:     fileName + '_Resume.pdf',
-        image:        { type: 'jpeg', quality: 0.98 },
-        html2canvas:  { scale: 2, useCORS: true, backgroundColor: '#ffffff', logging: false, scrollX: 0, scrollY: 0 },
-        jsPDF:        { unit: 'in', format: 'letter', orientation: 'portrait' },
-        pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+    return doc;
 }
 
 function exportPDF() {
@@ -492,36 +532,25 @@ function exportPDF() {
         return;
     }
 
-    var overlay = document.createElement('div');
-    overlay.id = 'pdf-overlay';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
-    var pdfContent = buildPdfContentElement();
-    overlay.appendChild(pdfContent);
-    document.body.appendChild(overlay);
-
     var fileName = getResumeFileBaseName();
     var btn = document.getElementById('export-btn');
     var originalHTML = btn.innerHTML;
     btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:-2px;margin-right:6px;"></span> Generating PDF...';
     btn.disabled = true;
 
-    var opt = pdfExportOptions(fileName);
-    opt.html2canvas.windowWidth = overlay.scrollWidth;
-
     setTimeout(function() {
-        html2pdf().set(opt).from(pdfContent).save().then(function() {
-            document.body.removeChild(overlay);
+        try {
+            var doc = buildResumePdfDoc();
+            doc.save(fileName + '_Resume.pdf');
             btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16" style="vertical-align:-2px;margin-right:6px;"><path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/><path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/></svg> Exported!';
             setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 2000);
-        }).catch(function(err) {
+        } catch (err) {
             console.error('PDF generation failed:', err);
-            var el = document.getElementById('pdf-overlay');
-            if (el) document.body.removeChild(el);
             btn.innerHTML = 'Export Failed - Try Again';
             btn.disabled = false;
             setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
-        });
-    }, 100);
+        }
+    }, 50);
 }
 
 function analyzeNow() {
@@ -532,39 +561,28 @@ function analyzeNow() {
         return;
     }
 
-    var overlay = document.createElement('div');
-    overlay.id = 'pdf-overlay-analyze';
-    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:#fff;z-index:99999;overflow:auto;';
-    var pdfContent = buildPdfContentElement();
-    overlay.appendChild(pdfContent);
-    document.body.appendChild(overlay);
-
     var fileName = getResumeFileBaseName();
     var btn = document.getElementById('analyze-btn');
     var originalHTML = btn.innerHTML;
     btn.innerHTML = '<span style="display:inline-block;width:14px;height:14px;border:2px solid #fff;border-top:2px solid transparent;border-radius:50%;animation:spin 0.8s linear infinite;vertical-align:-2px;margin-right:6px;"></span> Preparing...';
     btn.disabled = true;
 
-    var opt = pdfExportOptions(fileName);
-    opt.html2canvas.windowWidth = overlay.scrollWidth;
-
     setTimeout(function() {
-        html2pdf().set(opt).from(pdfContent).outputPdf('blob').then(function(blob) {
-            document.body.removeChild(overlay);
+        try {
+            var doc = buildResumePdfDoc();
+            var blob = doc.output('blob');
             var file = new File([blob], fileName + '_Resume.pdf', { type: 'application/pdf' });
             var dt = new DataTransfer();
             dt.items.add(file);
             document.getElementById('analyze-file-input').files = dt.files;
             document.getElementById('analyze-form').submit();
-        }).catch(function(err) {
+        } catch (err) {
             console.error('PDF generation for analysis failed:', err);
-            var el = document.getElementById('pdf-overlay-analyze');
-            if (el) document.body.removeChild(el);
             btn.innerHTML = 'Failed - Try Again';
             btn.disabled = false;
             setTimeout(function() { btn.innerHTML = originalHTML; btn.disabled = false; }, 3000);
-        });
-    }, 100);
+        }
+    }, 50);
 }
 
 // ---------- Autosave / restore / clear ----------
