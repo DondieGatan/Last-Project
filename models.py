@@ -654,6 +654,7 @@ def reset_user_password(email, new_password):
     conn.commit()
     cursor.close()
     conn.close()
+    return True, 'Password has been reset successfully.'
 
 
 # ============================================================================
