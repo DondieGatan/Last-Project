@@ -652,6 +652,21 @@ def builder_template(template_id):
     return redirect(url_for('builder'))
 
 
+def _builder_section_legend():
+    """Numbered list of the builder's sections plus whether each is a single
+    text block (safe for the AI to directly rewrite) or a repeatable
+    structured section like Work Experience (multiple entries with separate
+    fields — a single block of replacement text doesn't map onto that)."""
+    sections = RESUME_TEMPLATES['universal']['sections']
+    lines = []
+    for i, s in enumerate(sections, start=1):
+        kind = ('repeatable — holds multiple structured entries; never use a SUGGEST '
+                'marker for this one' if s.get('type') == 'repeatable'
+                else 'a single text block — safe to suggest a direct replacement for')
+        lines.append(f'{i}. {s["name"]} ({kind})')
+    return '\n'.join(lines)
+
+
 def _resume_chat_reply(message, history, resume_context):
     """Call Google's Gemini API for the Resume Builder's AI assistant.
     Raises on failure — the caller decides how to report it."""
@@ -660,12 +675,21 @@ def _resume_chat_reply(message, history, resume_context):
         'resume builder tool. Help the user strengthen their resume: sharpen '
         'wording, suggest strong action verbs, quantify achievements, fix clarity '
         'issues, and keep advice ATS-friendly (simple formatting, no tables or '
-        'graphics). When you rewrite something, show the improved text clearly so '
-        "the user can copy it straight into the relevant field. Keep replies "
-        "concise and grounded in the user's actual resume content below — don't "
-        "ask them to repeat information that's already there. Reply in plain "
-        'text only — no markdown (no **bold**, no # headings, no backticks); '
-        'use plain dashes or numbers for lists instead.\n\n'
+        'graphics). Keep replies concise and grounded in the user\'s actual resume '
+        "content below — don't ask them to repeat information that's already there. "
+        'Reply in plain text only — no markdown (no **bold**, no # headings, no '
+        'backticks); use plain dashes or numbers for lists instead.\n\n'
+        'The resume has these sections, in order:\n' + _builder_section_legend() + '\n\n'
+        'When you have a concrete, ready-to-use replacement for one of the single-'
+        'text-block sections above, wrap ONLY that replacement text in a marker on '
+        'its own lines, using the section\'s number from the list, like this:\n'
+        '[[SUGGEST:3]]\nThe improved text goes here.\n[[/SUGGEST]]\n'
+        'Never wrap a repeatable section (Work Experience, Education) in a SUGGEST '
+        "marker — describe what to change there in plain sentences instead, since "
+        "those hold several separate fields you can't replace with one block of "
+        'text. Only use a SUGGEST marker when confidently rewriting that whole '
+        "section's content; for general advice, questions, or lists of ideas, just "
+        'reply normally with no marker.\n\n'
         'Current resume draft:\n' + (resume_context or '(nothing written yet)')
     )
     contents = []
@@ -684,7 +708,7 @@ def _resume_chat_reply(message, history, resume_context):
         json={
             'system_instruction': {'parts': [{'text': system_prompt}]},
             'contents': contents,
-            'generationConfig': {'maxOutputTokens': 600, 'temperature': 0.7},
+            'generationConfig': {'maxOutputTokens': 2048, 'temperature': 0.7},
         },
         timeout=30,
     )

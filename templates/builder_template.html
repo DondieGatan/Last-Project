@@ -151,8 +151,11 @@
         <span>AI Resume Assistant</span>
         <button type="button" class="ai-chat-close" onclick="toggleAiChat()" aria-label="Close AI assistant">&times;</button>
     </div>
+    <div class="ai-chat-quick-actions">
+        <button type="button" class="ai-chat-gap-btn" onclick="fillGapsAndImprove()" id="ai-chat-gap-btn">Review My Whole Resume for Gaps</button>
+    </div>
     <div class="ai-chat-messages" id="ai-chat-messages">
-        <div class="ai-chat-msg ai-chat-msg-bot">Hi! I can see what you've written so far. Ask me to tighten your summary, strengthen a bullet point, suggest skills for a role, or fix grammar — I'll suggest text you can copy straight into your resume.</div>
+        <div class="ai-chat-msg ai-chat-msg-bot">Hi! I can see what you've written so far. Ask me to tighten your summary, strengthen a bullet point, suggest skills for a role, or fix grammar — or click "Review My Whole Resume for Gaps" above for a full pass. Suggestions I can apply directly show an Apply button.</div>
     </div>
     <div class="ai-chat-input-row">
         <textarea id="ai-chat-input" rows="1" placeholder="Ask me to improve a section..." onkeydown="handleAiChatKeydown(event)"></textarea>
@@ -877,21 +880,126 @@ function toggleAiChat() {
     if (aiChatOpen) document.getElementById('ai-chat-input').focus();
 }
 
+// A bot reply may wrap a ready-to-use rewrite for a single-text-block
+// section in [[SUGGEST:<sectionIndex>]]...[[/SUGGEST]] (see the system
+// prompt server-side) — parsed out here into an applyable suggestion card
+// rather than shown as raw marker text.
+var SUGGEST_RE = /\[\[SUGGEST:(\d+)\]\]([\s\S]*?)\[\[\/SUGGEST\]\]/g;
+
 function appendAiChatMessage(role, text) {
     var messages = document.getElementById('ai-chat-messages');
     var div = document.createElement('div');
     div.className = 'ai-chat-msg ' + (role === 'user' ? 'ai-chat-msg-user' : 'ai-chat-msg-bot');
-    div.textContent = text;
+    if (role === 'user') {
+        div.textContent = text;
+    } else {
+        renderBotMessageContent(div, text);
+    }
     messages.appendChild(div);
     messages.scrollTop = messages.scrollHeight;
     return div;
+}
+
+// Matches an opening marker with no closing tag — happens when a reply gets
+// cut off mid-suggestion (hit the output token limit). Best-effort: treat
+// everything after it as that suggestion's (possibly truncated) text,
+// rather than leaking the raw "[[SUGGEST:n]]" marker into the chat.
+var SUGGEST_UNTERMINATED_RE = /\[\[SUGGEST:(\d+)\]\]([\s\S]*)$/;
+
+function renderBotMessageContent(container, text) {
+    var lastIndex = 0;
+    var match;
+    var found = false;
+    SUGGEST_RE.lastIndex = 0;
+
+    function appendText(t) {
+        var trimmed = t.trim();
+        if (!trimmed) return;
+        var p = document.createElement('div');
+        p.className = 'ai-chat-text';
+        p.textContent = trimmed;
+        container.appendChild(p);
+    }
+
+    while ((match = SUGGEST_RE.exec(text)) !== null) {
+        found = true;
+        appendText(text.slice(lastIndex, match.index));
+        container.appendChild(buildSuggestionCard(parseInt(match[1], 10), match[2].trim()));
+        lastIndex = SUGGEST_RE.lastIndex;
+    }
+    var rest = text.slice(lastIndex);
+    var unterminated = rest.match(SUGGEST_UNTERMINATED_RE);
+    if (unterminated) {
+        appendText(rest.slice(0, unterminated.index));
+        container.appendChild(buildSuggestionCard(parseInt(unterminated[1], 10), unterminated[2].trim()));
+    } else if (rest.trim() || !found) {
+        appendText(rest);
+    }
+}
+
+function buildSuggestionCard(sectionIndex, suggestionText) {
+    var section = SECTIONS[sectionIndex - 1];
+    var canApply = !!(section && section.type !== 'repeatable' && suggestionText);
+
+    var card = document.createElement('div');
+    card.className = 'ai-chat-suggestion';
+
+    var label = document.createElement('div');
+    label.className = 'ai-chat-suggestion-label';
+    label.textContent = 'Suggested for: ' + (section ? section.name : 'your resume');
+    card.appendChild(label);
+
+    var body = document.createElement('div');
+    body.className = 'ai-chat-suggestion-text';
+    body.textContent = suggestionText;
+    card.appendChild(body);
+
+    var actions = document.createElement('div');
+    actions.className = 'ai-chat-suggestion-actions';
+
+    if (canApply) {
+        var applyBtn = document.createElement('button');
+        applyBtn.type = 'button';
+        applyBtn.className = 'ai-chat-apply-btn';
+        applyBtn.textContent = 'Apply to ' + section.name;
+        applyBtn.addEventListener('click', function() {
+            applySuggestion(sectionIndex, suggestionText, applyBtn);
+        });
+        actions.appendChild(applyBtn);
+    }
+
+    var dismissBtn = document.createElement('button');
+    dismissBtn.type = 'button';
+    dismissBtn.className = 'ai-chat-dismiss-btn';
+    dismissBtn.textContent = 'Dismiss';
+    dismissBtn.addEventListener('click', function() { card.remove(); });
+    actions.appendChild(dismissBtn);
+
+    card.appendChild(actions);
+    return card;
+}
+
+function applySuggestion(sectionIndex, text, btnEl) {
+    var ta = document.getElementById('section-' + sectionIndex);
+    if (!ta) return;
+    ta.value = text;
+    // Reuses the same listener the textarea already has (init() below) to
+    // sync draftData, autosave, the preview, and the progress tracker —
+    // no need to duplicate that logic here.
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+
+    btnEl.textContent = 'Applied';
+    btnEl.disabled = true;
+    ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    ta.classList.add('ai-chat-applied-flash');
+    setTimeout(function() { ta.classList.remove('ai-chat-applied-flash'); }, 1500);
 }
 
 function getFullResumeContext() {
     var text = '';
     for (var i = 1; i <= SECTIONS.length; i++) {
         var content = getSectionDisplayText(i);
-        if (content) text += SECTIONS[i - 1].name.toUpperCase() + '\n' + content + '\n\n';
+        text += i + '. ' + SECTIONS[i - 1].name.toUpperCase() + '\n' + (content || '(empty)') + '\n\n';
     }
     return text.trim();
 }
@@ -907,11 +1015,26 @@ function sendAiChatMessage() {
     var input = document.getElementById('ai-chat-input');
     var message = input.value.trim();
     if (!message) return;
-
-    appendAiChatMessage('user', message);
     input.value = '';
+    sendChatText(message);
+}
+
+function fillGapsAndImprove() {
+    sendChatText(
+        "Please review my entire resume right now, in this single reply — don't ask me questions " +
+        "first, just give your full analysis. Go section by section through everything listed above. " +
+        "For each single-text-block section that's missing, weak, generic, or incomplete, write out " +
+        "a concrete improved replacement wrapped in a SUGGEST marker. For repeatable sections (Work " +
+        "Experience, Education), describe in plain sentences what to add or strengthen."
+    );
+}
+
+function sendChatText(message) {
+    appendAiChatMessage('user', message);
     var sendBtn = document.getElementById('ai-chat-send');
+    var gapBtn = document.getElementById('ai-chat-gap-btn');
     sendBtn.disabled = true;
+    gapBtn.disabled = true;
 
     var typing = appendAiChatMessage('bot', 'Thinking...');
     typing.classList.add('ai-chat-typing');
@@ -943,6 +1066,7 @@ function sendAiChatMessage() {
         appendAiChatMessage('bot', 'Could not reach the AI assistant. Check your connection and try again.');
     }).finally(function() {
         sendBtn.disabled = false;
+        gapBtn.disabled = false;
     });
 }
 
