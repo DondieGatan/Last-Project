@@ -1642,6 +1642,11 @@ h1, h2, h3, .card-header, .dash-header h2 {
     bottom: 1.5rem;
     right: 1.5rem;
     z-index: 900;
+    /* border-radius only affects painting, not click/tap hit-testing — without
+       this, the pill's invisible "corners" (its full rectangular bounding box)
+       could still intercept clicks meant for a button underneath on narrow
+       screens where the action-button row runs close to this corner. */
+    clip-path: inset(0 round 999px);
     display: flex;
     align-items: center;
     gap: 0.5rem;
