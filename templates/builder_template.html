@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% set body_bg = true %}
 {% block title %}{{ template.title }} - Smart Resume Analyser{% endblock %}
 
 {% block content %}
@@ -707,24 +708,29 @@ function loadDraft() {
 }
 
 function clearDraft() {
-    if (!confirm('Clear everything you\'ve entered for this template? This cannot be undone.')) return;
-    try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* nothing to clear */ }
+    showConfirmModal(
+        'Clear everything you\'ve entered for this template? This cannot be undone.',
+        { title: 'Clear this draft?', confirmLabel: 'Clear Draft' }
+    ).then(function(ok) {
+        if (!ok) return;
+        try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* nothing to clear */ }
 
-    draftData = { sections: {} };
-    SECTIONS.forEach(function(section, i) {
-        var idx = i + 1;
-        if (section.type === 'repeatable') {
-            draftData.sections[idx] = [];
-            renderEntries(idx);
-        } else {
-            draftData.sections[idx] = '';
-            var ta = document.getElementById('section-' + idx);
-            if (ta) ta.value = '';
-        }
+        draftData = { sections: {} };
+        SECTIONS.forEach(function(section, i) {
+            var idx = i + 1;
+            if (section.type === 'repeatable') {
+                draftData.sections[idx] = [];
+                renderEntries(idx);
+            } else {
+                draftData.sections[idx] = '';
+                var ta = document.getElementById('section-' + idx);
+                if (ta) ta.value = '';
+            }
+        });
+        updateDraftStatus(null);
+        generatePreview();
+        updateProgress();
     });
-    updateDraftStatus(null);
-    generatePreview();
-    updateProgress();
 }
 
 // ---------- Grammar & Spell Check ----------

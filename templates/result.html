@@ -349,7 +349,7 @@
     <button id="export-result-btn" class="btn btn-secondary" onclick="exportResultPDF()" type="button">Export as PDF</button>
     <a href="{{ url_for('index') }}" class="btn btn-secondary">Analyse Another Resume</a>
     <a href="{{ url_for('history') }}" class="btn btn-secondary">View History</a>
-    <form method="POST" action="{{ url_for('delete_resume_route', resume_id=resume.id) }}" onsubmit="return confirm('Permanently delete this resume and its analysis? This can\'t be undone.');" style="display:inline;">
+    <form method="POST" action="{{ url_for('delete_resume_route', resume_id=resume.id) }}" onsubmit="return confirmDeleteSubmit(event, this, 'Permanently delete this resume and its analysis? This can\'t be undone.');" style="display:inline;">
         <button type="submit" class="btn btn-danger">Delete This Resume</button>
     </form>
 </div>

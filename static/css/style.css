@@ -299,10 +299,50 @@ code {
     display: block;
 }
 
+/* Driven directly by [data-theme], which is set synchronously in <head>
+   before first paint — not by a JS-added class on DOMContentLoaded, which
+   used to mean every full-page navigation flashed the wrong icon (and, for
+   the sidebar switch below, visibly animated the knob into place). */
+#theme-icon-moon {
+    display: none;
+}
+
+[data-theme="dark"] #theme-icon-sun {
+    display: none;
+}
+
+[data-theme="dark"] #theme-icon-moon {
+    display: block;
+}
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+}
+
+/* Browsers don't inherit typography into form controls by default — every
+   <button>, <input>, <select>, and <textarea> silently falls back to the
+   OS's UI font (e.g. Arial) at the browser's own line-height instead of
+   the page's Poppins/1.6, no matter what .btn or other classes set. That's
+   why a <button class="btn"> (Delete) could end up sized/rendered
+   differently from an <a class="btn"> (View) with identical classes, and
+   why pages built mostly from real <button>s (like the Resume Builder)
+   could end up looking visually off from pages using <a class="btn">
+   links for the same component. */
+button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+    color: inherit;
+}
+
+/* Only <button> gets its native OS chrome stripped — <select> still needs
+   its native dropdown arrow (no custom one is defined in this stylesheet),
+   and checkbox/radio/range inputs still need their native widget look. */
+button {
+    appearance: none;
+    -webkit-appearance: none;
 }
 
 body {
@@ -379,6 +419,14 @@ h1, h2, h3, .card-header, .dash-header h2 {
     padding: 0 1.5rem;
     width: 100%;
     min-width: 0;
+    /* Only takes effect inside .app-content's column flex layout (the
+       logged-in sidebar shell) — grows to fill the leftover vertical space
+       so .footer, which follows it in the DOM, is pushed to the bottom of
+       the viewport on short pages instead of floating right under the
+       content with a gap of bare background beneath it. No-op in the
+       logged-out navbar layout, where .main's parent isn't a flex
+       container. */
+    flex: 1;
 }
 
 /* ---------- Cards ---------- */
@@ -538,7 +586,11 @@ h1, h2, h3, .card-header, .dash-header h2 {
 .btn {
     display: inline-block;
     padding: 0.75rem 2rem;
-    border: none;
+    /* Transparent, not none — .btn-secondary adds a real border in dark
+       mode, so every variant reserves the same 1px box regardless of
+       whether it uses it, keeping mixed button rows (e.g. View/Delete)
+       pixel-aligned instead of the bordered one sitting 2px taller. */
+    border: 1px solid transparent;
     border-radius: 999px;
     font-size: 1rem;
     font-weight: 600;
@@ -2784,7 +2836,7 @@ table tr:hover { background: var(--gray-50); }
     height: 10px;
 }
 
-.theme-switch.is-dark .theme-switch-knob {
+[data-theme="dark"] .theme-switch-knob {
     left: 20px;
 }
 
@@ -2962,6 +3014,14 @@ html[data-sidebar-collapsed="true"] .sidebar-logout {
     min-width: 0;
     display: flex;
     flex-direction: column;
+    /* .app-shell uses align-items: flex-start so its sticky, self-sized
+       sidebar isn't forced to stretch — but that leaves .app-content only
+       as tall as its own content by default too, which left .main's
+       flex: 1 with no extra height to grow into on short pages, so the
+       footer never actually reached the bottom of the viewport. Stretching
+       just this child (not the shared align-items) fixes that without
+       touching the sidebar's sizing at all. */
+    align-self: stretch;
 }
 
 .app-topbar {
