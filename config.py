@@ -61,6 +61,14 @@ class Config:
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
     MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER', '')
 
+    # SendGrid (HTTP-based transactional email) — preferred over Resend when
+    # set. Resend's free tier can only deliver to the email address the
+    # Resend account itself was signed up with until a full domain is
+    # verified; SendGrid's free tier only needs one sender EMAIL verified
+    # (no domain/DNS) and can then deliver to any recipient.
+    SENDGRID_API_KEY = os.environ.get('SENDGRID_API_KEY', '')
+    SENDGRID_FROM = os.environ.get('SENDGRID_FROM', '')
+
     # Resend (HTTP-based transactional email) — used instead of SMTP when
     # set, since some hosts (e.g. Render's free tier) block outbound SMTP
     # ports entirely but always allow outbound HTTPS.

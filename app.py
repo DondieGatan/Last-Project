@@ -146,10 +146,27 @@ def login():
 
 
 def _send_email(to, subject, html):
-    """Send an email via Resend's HTTP API if configured (production, where
-    outbound SMTP is commonly blocked), otherwise via Flask-Mail/SMTP
-    (local dev). Raises on failure — callers decide how to report it."""
-    if Config.RESEND_API_KEY:
+    """Send an email via SendGrid or Resend's HTTP API if configured
+    (production, where outbound SMTP is commonly blocked), otherwise via
+    Flask-Mail/SMTP (local dev). SendGrid is tried first — its free tier
+    delivers to any recipient once a single sender email is verified,
+    unlike Resend's free tier, which can only deliver to the email address
+    the Resend account itself was signed up with until a full domain is
+    verified. Raises on failure — callers decide how to report it."""
+    if Config.SENDGRID_API_KEY:
+        resp = requests.post(
+            'https://api.sendgrid.com/v3/mail/send',
+            headers={'Authorization': f'Bearer {Config.SENDGRID_API_KEY}'},
+            json={
+                'personalizations': [{'to': [{'email': to}]}],
+                'from': {'email': Config.SENDGRID_FROM},
+                'subject': subject,
+                'content': [{'type': 'text/html', 'value': html}],
+            },
+            timeout=10,
+        )
+        resp.raise_for_status()
+    elif Config.RESEND_API_KEY:
         resp = requests.post(
             'https://api.resend.com/emails',
             headers={'Authorization': f'Bearer {Config.RESEND_API_KEY}'},
