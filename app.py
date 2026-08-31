@@ -215,8 +215,14 @@ def register():
 
         success, message = register_user(full_name, email, password)
         if success:
-            _send_verification_email(email)
-            return redirect(url_for('verify_email', email=email))
+            # No email-verification step — log the new account straight in,
+            # the same way login() does.
+            user = authenticate_user(email, password)
+            session['user_id'] = user['id']
+            session['user_name'] = user['full_name']
+            session['user_email'] = user['email']
+            flash(f'Welcome, {user["full_name"]}!', 'success')
+            return redirect(url_for('index'))
         else:
             flash(message, 'error')
             return render_template('register.html', full_name=full_name, email=email)

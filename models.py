@@ -455,8 +455,10 @@ def register_user(full_name, email, password):
         return False, 'An account with this email already exists.'
 
     password_hash = _hash_password(password)
+    # email_verified=1: registration no longer requires an email-verification
+    # step, so new accounts are usable immediately.
     cursor.execute(
-        "INSERT INTO users (full_name, email, password_hash) VALUES (?, ?, ?)",
+        "INSERT INTO users (full_name, email, password_hash, email_verified) VALUES (?, ?, ?, 1)",
         (full_name.strip(), email.lower().strip(), password_hash)
     )
     conn.commit()
