@@ -125,9 +125,6 @@ def login():
             return render_template('login.html')
 
         user = authenticate_user(email, password)
-        if user and not user.get('email_verified'):
-            flash('Please verify your email before logging in.', 'error')
-            return redirect(url_for('verify_email', email=user['email']))
         if user:
             session['user_id'] = user['id']
             session['user_name'] = user['full_name']

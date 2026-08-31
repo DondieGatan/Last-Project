@@ -73,6 +73,13 @@ def ensure_schema_migrations():
         # Runs only once, right after the column is added, never again.
         cursor.execute("UPDATE users SET email_verified = 1")
         conn.commit()
+    # Email verification is no longer a feature at all — login() doesn't
+    # gate on this column anymore — but accounts registered while it still
+    # was (before that change shipped) can be stuck with email_verified=0
+    # forever, since nothing ever flips it back. Idempotent: matches zero
+    # rows, and is a no-op, once every account has already been backfilled.
+    cursor.execute("UPDATE users SET email_verified = 1 WHERE email_verified = 0")
+    conn.commit()
     cursor.execute("""
         IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('users') AND name = 'verification_code')
         BEGIN
